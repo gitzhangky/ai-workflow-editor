@@ -1,0 +1,21 @@
+<RCC>
+  <qresource prefix="/app-theme">
+    <file>icons/nodes/ai.svg</file>
+    <file>icons/nodes/condition.svg</file>
+    <file>icons/nodes/flow.svg</file>
+    <file>icons/nodes/integration.svg</file>
+    <file>icons/nodes/llm.svg</file>
+    <file>icons/nodes/output.svg</file>
+    <file>icons/nodes/prompt.svg</file>
+    <file>icons/nodes/start.svg</file>
+    <file>icons/nodes/tool.svg</file>
+    <file>icons/toolbar/center.svg</file>
+    <file>icons/toolbar/language.svg</file>
+    <file>icons/toolbar/new.svg</file>
+    <file>icons/toolbar/open.svg</file>
+    <file>icons/toolbar/redo.svg</file>
+    <file>icons/toolbar/save.svg</file>
+    <file>icons/toolbar/undo.svg</file>
+    <file>styles/workbench.qss</file>
+  </qresource>
+</RCC>

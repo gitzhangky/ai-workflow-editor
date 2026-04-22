@@ -1,0 +1,211 @@
+QMainWindow#appMainWindow {
+    background-color: #f6f3ed;
+}
+
+QMainWindow::separator {
+    background: #dfd7cc;
+    width: 1px;
+    height: 1px;
+}
+
+QMenuBar {
+    background: #fcfaf6;
+    border-bottom: 1px solid #e2dacf;
+    color: #4c433b;
+    padding: 6px 10px;
+}
+
+QMenuBar::item {
+    background: transparent;
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-right: 4px;
+}
+
+QMenuBar::item:selected {
+    background: #f0e8db;
+}
+
+QMenu {
+    background: #fffdf9;
+    border: 1px solid #ddd4c6;
+    padding: 8px;
+}
+
+QMenu::item {
+    border-radius: 8px;
+    padding: 8px 26px 8px 10px;
+}
+
+QMenu::item:selected {
+    background: #eef4ff;
+    color: #20344f;
+}
+
+QToolBar#primaryToolBar {
+    background: #fcfaf6;
+    border: none;
+    border-bottom: 1px solid #ddd5c9;
+    padding: 10px 18px;
+    spacing: 8px;
+}
+
+QToolBar#primaryToolBar QToolButton {
+    background: #f7f1e7;
+    border: 1px solid #d9cfbf;
+    border-radius: 10px;
+    color: #2d241f;
+    font-weight: 600;
+    min-height: 34px;
+    min-width: 56px;
+    padding: 0 14px;
+}
+
+QToolBar#primaryToolBar QToolButton:hover {
+    background: #f1e8da;
+    border-color: #cabca7;
+}
+
+QToolBar#primaryToolBar QToolButton:pressed {
+    background: #e9decd;
+}
+
+QDockWidget#nodeLibraryDock,
+QDockWidget#inspectorDock {
+    background: #fbfaf7;
+    border: none;
+}
+
+QDockWidget#nodeLibraryDock::title,
+QDockWidget#inspectorDock::title {
+    background: #fbfaf7;
+    border-bottom: 1px solid #e1d9cd;
+    color: #4c433b;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 14px 18px 10px 18px;
+    text-transform: uppercase;
+}
+
+QDockWidget#nodeLibraryDock > QWidget,
+QDockWidget#inspectorDock > QWidget {
+    background: #fbfaf7;
+}
+
+QWidget#nodeLibraryPanel {
+    background: #fbfaf7;
+}
+
+QLineEdit#nodeLibrarySearchEdit {
+    background: #fffdf9;
+    border: 1px solid #ddd2c2;
+    border-radius: 10px;
+    color: #2d241f;
+    padding: 8px 10px;
+}
+
+QLineEdit#nodeLibrarySearchEdit:focus {
+    border-color: #4b84d9;
+}
+
+QListWidget#nodeLibraryList {
+    background: #fbfaf7;
+    border: none;
+    outline: none;
+    padding: 12px;
+    show-decoration-selected: 0;
+}
+
+QWidget#inspectorPanel {
+    background: #fbfaf7;
+}
+
+QLabel#inspectorHintLabel {
+    color: #6f6459;
+    padding-bottom: 4px;
+}
+
+QLabel#inspectorTypeBadgeLabel {
+    background: #ece3d4;
+    border-radius: 10px;
+    color: #5a4d40;
+    font-weight: 700;
+    padding: 6px 10px;
+}
+
+QLabel#inspectorTypeSummaryLabel {
+    color: #7a6d5f;
+    margin-top: -4px;
+    margin-bottom: 2px;
+}
+
+QLabel#inspectorSectionTitleLabel {
+    color: #4c433b;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 6px;
+}
+
+QLabel#inspectorEmptyStateLabel {
+    background: #f4eee4;
+    border: 1px dashed #d8cdbb;
+    border-radius: 10px;
+    color: #6e6254;
+    padding: 10px 12px;
+}
+
+QWidget#inspectorPanel QLabel {
+    color: #4c433b;
+    font-weight: 600;
+}
+
+QWidget#inspectorPanel QLineEdit,
+QWidget#inspectorPanel QSpinBox,
+QWidget#inspectorPanel QDoubleSpinBox,
+QWidget#inspectorPanel QTextEdit {
+    background: #ffffff;
+    border: 1px solid #ddd2c2;
+    border-radius: 10px;
+    color: #2d241f;
+    padding: 8px 10px;
+    selection-background-color: #4b84d9;
+}
+
+QWidget#inspectorPanel QLineEdit:focus,
+QWidget#inspectorPanel QSpinBox:focus,
+QWidget#inspectorPanel QDoubleSpinBox:focus,
+QWidget#inspectorPanel QTextEdit:focus {
+    border-color: #4b84d9;
+}
+
+QWidget#workflowCanvas {
+    background: #f5f0e7;
+    border-left: 1px solid #dfd7cc;
+    border-right: 1px solid #dfd7cc;
+}
+
+QWidget#workflowCanvas QGraphicsView {
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #f8f4ec,
+        stop: 1 #f1e9dc
+    );
+    border: none;
+}
+
+QFrame#dropPreviewIndicator {
+    background-color: rgba(75, 132, 217, 40);
+    border: 2px dashed rgba(75, 132, 217, 200);
+    border-radius: 8px;
+}
+
+QStatusBar,
+QStatusBar#primaryStatusBar {
+    background: #f8f3eb;
+    border-top: 1px solid #ddd4c6;
+    color: #63594e;
+}
+
+QStatusBar::item {
+    border: none;
+}
