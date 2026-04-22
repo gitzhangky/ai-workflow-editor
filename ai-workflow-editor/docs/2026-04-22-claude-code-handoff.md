@@ -49,12 +49,19 @@ Implemented today:
   - card-style grouped rendering
 - Basic automated tests for app shell, theme, node library, language behavior, save/load, and canvas behaviors.
 
+Implemented in Phase 1 (2026-04-22):
+
+- Dirty-state tracking: `workflowModified()` signal from `QtNodesEditorWidget`, `_dirty` flag in `MainWindow`
+- Window title shows `*` prefix when unsaved, filename after save
+- Close/new/open confirmation dialog when document is dirty (`maybeSave()`)
+- Save As action in File menu
+- Recent files menu (persisted via QSettings, max 10 entries)
+- Chinese translations for all new UI strings
+
 Not implemented yet:
 
 - Workflow execution engine
 - Undo/redo wiring to real editing commands
-- Dirty-state tracking and close confirmation
-- Recent files
 - Context menus and deletion flows
 - Rich node validation and inline error presentation
 - Search/filter inside the canvas
@@ -85,7 +92,10 @@ Not implemented yet:
 - `src/app/MainWindow.hpp`
 - `src/app/MainWindow.cpp`
   - Main workbench shell
-  - Menus, toolbar, docks, language menu, file open/save actions
+  - Menus, toolbar, docks, language menu, file open/save/save-as actions
+  - Dirty-state tracking (`markDirty`, `clearDirty`, `updateWindowTitle`)
+  - Close/new/open unsaved confirmation (`maybeSave`, `closeEvent`)
+  - Recent files menu (`addToRecentFiles`, `rebuildRecentFilesMenu`, persisted in QSettings)
   - Node library creation and population
   - Wires editor and inspector together
 
@@ -140,6 +150,7 @@ Not implemented yet:
   - Save/load workflow JSON
   - Selection propagation
   - Node style application
+  - Emits `workflowModified()` on any document mutation
 
 - `src/qtnodes/StaticNodeDelegateModel.hpp`
 - `src/qtnodes/StaticNodeDelegateModel.cpp`
@@ -214,12 +225,12 @@ Still important for Windows + Qt 5.13.2:
 
 ## Known Technical Debt
 
-- No dirty-state tracking on the workflow document.
 - `Undo` and `Redo` actions are present in UI but not wired to actual command stacks.
 - Save/load currently lives in the editor adapter layer rather than a stronger document model.
 - Node properties are only typed at the form level, not via a formal schema engine.
 - Left node library visuals have been iterated heavily; if restyling again, keep the custom delegate as the single source of truth.
-- There is no explicit document object like `WorkflowDocument` yet.
+- There is no explicit document object like `WorkflowDocument` yet. If `MainWindow.cpp` grows past ~600 lines, extract one.
+- No node/connection deletion flow yet — users cannot remove items from the canvas.
 
 ## Recommended Next Development Order
 
@@ -251,18 +262,21 @@ See the companion plan file:
 - When changing inspector behavior, inspect both:
   - `InspectorPanel.cpp`
   - `QtNodesEditorWidget.cpp`
+- Any operation that mutates document state must emit `workflowModified()` from `QtNodesEditorWidget`.
+- Add Chinese translations to `ai_workflow_editor_zh_CN.ts` for all new user-facing strings.
+- See `CLAUDE.md` at repo root for the full agent guide.
 
 ## Best Immediate Next Task
 
-If Claude Code is going to continue immediately, the best next task is:
+If an agent is going to continue immediately, the best next task is:
 
-`Add workflow dirty-state tracking, close confirmation, and recent/opened file UX.`
+`Add delete selected node/connection, right-click context menu, and keyboard shortcuts.`
 
-Why this should go first:
+Why this should go next:
 
-- The app already supports save/load.
-- The editor is now interactive enough that accidental data loss becomes a real risk.
-- This work improves product usefulness without forcing a larger architecture jump.
+- Users can create nodes and connections but cannot remove them without editing the JSON file.
+- This is the most basic editing operation still missing.
+- It does not require architectural changes — deletion goes through `DataFlowGraphModel` and `_nodeStates`.
 
 ## Verification Baseline
 
@@ -276,5 +290,6 @@ ctest --test-dir ai-workflow-editor/build --output-on-failure
 
 Expected current result:
 
-- `4/4` tests passing
+- `4/4` test suites passing
+- App test suite includes 30 test functions (23 original + 7 Phase 1 additions)
 

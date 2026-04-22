@@ -5,6 +5,7 @@
 #include "qtnodes/StaticNodeDelegateModel.hpp"
 #include "qtnodes/StyledNodePainter.hpp"
 
+#include <QtNodes/internal/ConnectionGraphicsObject.hpp>
 #include <QtNodes/ConnectionStyle>
 #include <QtNodes/DataFlowGraphModel>
 #include <QtNodes/DataFlowGraphicsScene>
@@ -14,16 +15,20 @@
 #include <QtNodes/NodeStyle>
 #include <QtNodes/StyleCollection>
 
+#include <QAction>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QEvent>
 #include <QFile>
 #include <QFrame>
+#include <QGraphicsItem>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMenu>
 #include <QMimeData>
 #include <QPointF>
+#include <QShortcut>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -58,6 +63,17 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
 
     connect(_scene, &QtNodes::BasicGraphicsScene::nodeSelected, this, [this](QtNodes::NodeId nodeId) {
         handleNodeSelected(nodeId);
+    });
+
+    auto *deleteShortcut = new QShortcut(QKeySequence::Delete, this);
+    connect(deleteShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
+
+    auto *backspaceShortcut = new QShortcut(QKeySequence(Qt::Key_Backspace), this);
+    connect(backspaceShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
+
+    _view->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(_view, &QWidget::customContextMenuRequested, this, [this](QPoint const &pos) {
+        showCanvasContextMenu(_view->mapToGlobal(pos));
     });
 }
 
@@ -136,6 +152,7 @@ QtNodes::NodeId QtNodesEditorWidget::createNode(QString const &typeKey, QPointF 
     applyNodeStyle(nodeId, definition->typeKey);
 
     selectNode(nodeId);
+    Q_EMIT workflowModified();
     return nodeId;
 }
 
@@ -150,6 +167,7 @@ bool QtNodesEditorWidget::connectNodes(QtNodes::NodeId outNodeId,
         return false;
 
     _graphModel->addConnection(connectionId);
+    Q_EMIT workflowModified();
     return true;
 }
 
@@ -179,6 +197,56 @@ void QtNodesEditorWidget::clearWorkflow()
     _scene->clearSelection();
     clearDropPreview();
     Q_EMIT selectionCleared();
+}
+
+void QtNodesEditorWidget::deleteSelectedNodes()
+{
+    const auto ids = selectedNodeIds();
+    if (ids.empty())
+        return;
+
+    for (auto const nodeId : ids) {
+        _nodeStates.remove(nodeId);
+        _graphModel->deleteNode(nodeId);
+    }
+
+    _selectedNodeId = QtNodes::InvalidNodeId;
+    Q_EMIT selectionCleared();
+    Q_EMIT workflowModified();
+}
+
+void QtNodesEditorWidget::deleteSelectedConnections()
+{
+    const auto items = _scene->selectedItems();
+    bool deleted = false;
+
+    for (auto *item : items) {
+        auto *connectionObject = dynamic_cast<QtNodes::ConnectionGraphicsObject *>(item);
+        if (connectionObject == nullptr)
+            continue;
+
+        _graphModel->deleteConnection(connectionObject->connectionId());
+        deleted = true;
+    }
+
+    if (deleted)
+        Q_EMIT workflowModified();
+}
+
+void QtNodesEditorWidget::deleteSelection()
+{
+    const auto nodeIds = selectedNodeIds();
+    if (!nodeIds.empty()) {
+        deleteSelectedNodes();
+        return;
+    }
+
+    deleteSelectedConnections();
+}
+
+std::vector<QtNodes::NodeId> QtNodesEditorWidget::selectedNodeIds() const
+{
+    return _scene->selectedNodes();
 }
 
 int QtNodesEditorWidget::nodeCount() const
@@ -337,6 +405,7 @@ void QtNodesEditorWidget::setSelectedNodeDisplayName(QString const &displayName)
                                nodeStateIt->displayName,
                                nodeStateIt->description,
                                nodeStateIt->properties);
+    Q_EMIT workflowModified();
 }
 
 void QtNodesEditorWidget::setSelectedNodeDescription(QString const &description)
@@ -352,6 +421,7 @@ void QtNodesEditorWidget::setSelectedNodeDescription(QString const &description)
                                nodeStateIt->displayName,
                                nodeStateIt->description,
                                nodeStateIt->properties);
+    Q_EMIT workflowModified();
 }
 
 void QtNodesEditorWidget::setSelectedNodeProperty(QString const &propertyKey, QVariant const &value)
@@ -365,6 +435,7 @@ void QtNodesEditorWidget::setSelectedNodeProperty(QString const &propertyKey, QV
                                nodeStateIt->displayName,
                                nodeStateIt->description,
                                nodeStateIt->properties);
+    Q_EMIT workflowModified();
 }
 
 bool QtNodesEditorWidget::saveWorkflow(QString const &filePath) const
@@ -764,6 +835,44 @@ std::optional<QtNodesEditorWidget::NodeState> QtNodesEditorWidget::selectedState
         return std::nullopt;
 
     return *nodeStateIt;
+}
+
+void QtNodesEditorWidget::showCanvasContextMenu(QPoint const &globalPos)
+{
+    QMenu menu;
+    const auto nodeIds = selectedNodeIds();
+    const bool hasSelectedNodes = !nodeIds.empty();
+
+    bool hasSelectedConnections = false;
+    for (auto *item : _scene->selectedItems()) {
+        if (dynamic_cast<QtNodes::ConnectionGraphicsObject *>(item) != nullptr) {
+            hasSelectedConnections = true;
+            break;
+        }
+    }
+
+    if (hasSelectedNodes) {
+        QAction *deleteNodeAction = menu.addAction(tr("Delete Node"));
+        connect(deleteNodeAction, &QAction::triggered, this, &QtNodesEditorWidget::deleteSelectedNodes);
+    }
+
+    if (hasSelectedConnections) {
+        QAction *deleteConnectionAction = menu.addAction(tr("Delete Connection"));
+        connect(deleteConnectionAction, &QAction::triggered, this, &QtNodesEditorWidget::deleteSelectedConnections);
+    }
+
+    if (hasSelectedNodes || hasSelectedConnections)
+        menu.addSeparator();
+
+    QAction *selectAllAction = menu.addAction(tr("Select All"));
+    connect(selectAllAction, &QAction::triggered, this, [this]() {
+        for (auto const nodeId : sortedNodeIds()) {
+            if (auto *obj = _scene->nodeGraphicsObject(nodeId); obj != nullptr)
+                obj->setSelected(true);
+        }
+    });
+
+    menu.exec(globalPos);
 }
 
 QList<QtNodes::NodeId> QtNodesEditorWidget::sortedNodeIds() const

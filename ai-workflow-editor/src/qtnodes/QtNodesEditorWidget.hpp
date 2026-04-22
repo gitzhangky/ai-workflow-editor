@@ -9,6 +9,7 @@
 
 #include <optional>
 #include <memory>
+#include <vector>
 
 class QMimeData;
 
@@ -35,6 +36,10 @@ public:
                       QtNodes::PortIndex inPortIndex);
     void selectNode(QtNodes::NodeId nodeId);
     void clearWorkflow();
+    void deleteSelectedNodes();
+    void deleteSelectedConnections();
+    void deleteSelection();
+    std::vector<QtNodes::NodeId> selectedNodeIds() const;
     int nodeCount() const;
     int connectionCount() const;
     bool dropPreviewVisible() const;
@@ -65,6 +70,7 @@ Q_SIGNALS:
                              QString const &description,
                              QVariantMap const &properties);
     void selectionCleared();
+    void workflowModified();
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -97,6 +103,7 @@ private:
     QPointF scenePositionForWidgetPoint(QPoint const &widgetPoint) const;
     QPointF defaultScenePosition() const;
     std::optional<NodeState> selectedState() const;
+    void showCanvasContextMenu(QPoint const &globalPos);
     QList<QtNodes::NodeId> sortedNodeIds() const;
 
     BuiltInNodeRegistry _builtInNodeRegistry;

@@ -82,10 +82,20 @@
     <message><source>Save Workflow</source><translation>保存工作流</translation></message>
     <message><source>Saved %1</source><translation>已保存 %1</translation></message>
     <message><source>Loaded %1</source><translation>已加载 %1</translation></message>
+    <message><source>Save As...</source><translation>另存为...</translation></message>
+    <message><source>Recent Files</source><translation>最近文件</translation></message>
+    <message><source>Delete</source><translation>删除</translation></message>
+    <message><source>Unsaved Changes</source><translation>未保存的更改</translation></message>
+    <message><source>The current workflow has unsaved changes.
+Do you want to save before continuing?</source><translation>当前工作流有未保存的更改。
+是否在继续前保存？</translation></message>
   </context>
   <context>
     <name>QtNodesEditorWidget</name>
     <message><source>Release to create %1</source><translation>松开以创建 %1</translation></message>
     <message><source>Ready</source><translation>就绪</translation></message>
+    <message><source>Delete Node</source><translation>删除节点</translation></message>
+    <message><source>Delete Connection</source><translation>删除连接</translation></message>
+    <message><source>Select All</source><translation>全选</translation></message>
   </context>
 </TS>

@@ -6,17 +6,21 @@
 #include "registry/BuiltInNodeRegistry.hpp"
 
 #include <QAction>
+#include <QCloseEvent>
 #include <QColor>
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFont>
 #include <QIcon>
 #include <QLineEdit>
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
+#include <QSettings>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QToolButton>
@@ -49,6 +53,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _viewMenu(nullptr)
     , _settingsMenu(nullptr)
     , _languageMenu(nullptr)
+    , _recentFilesMenu(nullptr)
     , _primaryToolBar(nullptr)
     , _nodeLibraryDock(nullptr)
     , _inspectorDock(nullptr)
@@ -60,6 +65,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _newAction(nullptr)
     , _openAction(nullptr)
     , _saveAction(nullptr)
+    , _saveAsAction(nullptr)
+    , _deleteAction(nullptr)
     , _undoAction(nullptr)
     , _redoAction(nullptr)
     , _centerAction(nullptr)
@@ -70,6 +77,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _languageEnglishAction(nullptr)
     , _languageToolButton(nullptr)
     , _currentWorkflowPath()
+    , _dirty(false)
 {
     setObjectName("appMainWindow");
     resize(1280, 840);
@@ -96,6 +104,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _openAction->setObjectName("openAction");
     _saveAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("save")), QString());
     _saveAction->setObjectName("saveAction");
+    _saveAsAction = new QAction(this);
+    _saveAsAction->setObjectName("saveAsAction");
+    _deleteAction = new QAction(this);
+    _deleteAction->setObjectName("deleteAction");
     _undoAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("undo")), QString());
     _undoAction->setObjectName("undoAction");
     _redoAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("redo")), QString());
@@ -188,13 +200,23 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             _editorWidget,
             &QtNodesEditorWidget::setSelectedNodeProperty);
 
+    connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::markDirty);
+
+    _recentFilesMenu = new QMenu(this);
+    _recentFilesMenu->setObjectName("recentFilesMenu");
+
     connect(_newAction, &QAction::triggered, this, [this]() {
+        if (!maybeSave())
+            return;
         _editorWidget->clearWorkflow();
         _currentWorkflowPath.clear();
+        clearDirty();
         statusBar()->showMessage(tr("New workflow"));
     });
 
     connect(_openAction, &QAction::triggered, this, [this]() {
+        if (!maybeSave())
+            return;
         const auto filePath = QFileDialog::getOpenFileName(this,
                                                            tr("Open Workflow"),
                                                            QString(),
@@ -215,6 +237,17 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
         if (!filePath.isEmpty())
             saveWorkflowToPath(filePath);
     });
+
+    connect(_saveAsAction, &QAction::triggered, this, [this]() {
+        const auto filePath = QFileDialog::getSaveFileName(this,
+                                                           tr("Save Workflow"),
+                                                           QStringLiteral("workflow.json"),
+                                                           tr("Workflow Files (*.json)"));
+        if (!filePath.isEmpty())
+            saveWorkflowToPath(filePath);
+    });
+
+    connect(_deleteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::deleteSelection);
 
     connect(_languageChineseAction, &QAction::triggered, this, [this]() {
         if (_languageManager != nullptr)
@@ -266,6 +299,8 @@ bool MainWindow::saveWorkflowToPath(QString const &filePath)
     const bool saved = _editorWidget->saveWorkflow(filePath);
     if (saved) {
         _currentWorkflowPath = filePath;
+        clearDirty();
+        addToRecentFiles(filePath);
         statusBar()->showMessage(tr("Saved %1").arg(filePath));
     }
 
@@ -277,6 +312,8 @@ bool MainWindow::loadWorkflowFromPath(QString const &filePath)
     const bool loaded = _editorWidget->loadWorkflow(filePath);
     if (loaded) {
         _currentWorkflowPath = filePath;
+        clearDirty();
+        addToRecentFiles(filePath);
         statusBar()->showMessage(tr("Loaded %1").arg(filePath));
     }
 
@@ -334,10 +371,13 @@ void MainWindow::retranslateUi()
     _settingsMenu->setTitle(tr("Settings"));
     _languageMenu->setTitle(tr("Language"));
 
-    setWindowTitle(tr("AI Workflow Editor"));
     _newAction->setText(tr("New"));
     _openAction->setText(tr("Open"));
     _saveAction->setText(tr("Save"));
+    _saveAsAction->setText(tr("Save As..."));
+    _recentFilesMenu->setTitle(tr("Recent Files"));
+    _deleteAction->setText(tr("Delete"));
+    _deleteAction->setShortcut(QKeySequence::Delete);
     _undoAction->setText(tr("Undo"));
     _redoAction->setText(tr("Redo"));
     _centerAction->setText(tr("Center"));
@@ -361,10 +401,15 @@ void MainWindow::retranslateUi()
     _fileMenu->addAction(_newAction);
     _fileMenu->addAction(_openAction);
     _fileMenu->addAction(_saveAction);
+    _fileMenu->addAction(_saveAsAction);
+    _fileMenu->addSeparator();
+    _fileMenu->addMenu(_recentFilesMenu);
 
     _editMenu->clear();
     _editMenu->addAction(_undoAction);
     _editMenu->addAction(_redoAction);
+    _editMenu->addSeparator();
+    _editMenu->addAction(_deleteAction);
 
     _viewMenu->clear();
     _viewMenu->addAction(_centerAction);
@@ -379,6 +424,8 @@ void MainWindow::retranslateUi()
     _languageMenu->addAction(_languageChineseAction);
     _languageMenu->addAction(_languageEnglishAction);
 
+    updateWindowTitle();
+    rebuildRecentFilesMenu();
     populateNodeLibrary();
     updateLanguageActions();
 }
@@ -389,4 +436,110 @@ void MainWindow::updateLanguageActions()
         _languageManager == nullptr || _languageManager->currentLanguage() == LanguageManager::Language::Chinese;
     _languageChineseAction->setChecked(chineseSelected);
     _languageEnglishAction->setChecked(!chineseSelected);
+}
+
+bool MainWindow::isDirty() const
+{
+    return _dirty;
+}
+
+QStringList MainWindow::recentFiles() const
+{
+    QSettings settings;
+    return settings.value(QStringLiteral("recentFiles")).toStringList();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (maybeSave())
+        event->accept();
+    else
+        event->ignore();
+}
+
+void MainWindow::markDirty()
+{
+    if (!_dirty) {
+        _dirty = true;
+        updateWindowTitle();
+    }
+}
+
+void MainWindow::clearDirty()
+{
+    _dirty = false;
+    updateWindowTitle();
+}
+
+void MainWindow::updateWindowTitle()
+{
+    QString title = tr("AI Workflow Editor");
+    if (!_currentWorkflowPath.isEmpty())
+        title = QFileInfo(_currentWorkflowPath).fileName() + QStringLiteral(" - ") + title;
+    if (_dirty)
+        title = QStringLiteral("* ") + title;
+    setWindowTitle(title);
+}
+
+bool MainWindow::maybeSave()
+{
+    if (!_dirty)
+        return true;
+
+    const auto result = QMessageBox::warning(this,
+                                              tr("Unsaved Changes"),
+                                              tr("The current workflow has unsaved changes.\n"
+                                                 "Do you want to save before continuing?"),
+                                              QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+                                              QMessageBox::Save);
+
+    if (result == QMessageBox::Cancel)
+        return false;
+
+    if (result == QMessageBox::Save) {
+        QString filePath = _currentWorkflowPath;
+        if (filePath.isEmpty()) {
+            filePath = QFileDialog::getSaveFileName(this,
+                                                    tr("Save Workflow"),
+                                                    QStringLiteral("workflow.json"),
+                                                    tr("Workflow Files (*.json)"));
+        }
+
+        if (filePath.isEmpty())
+            return false;
+
+        return saveWorkflowToPath(filePath);
+    }
+
+    return true;
+}
+
+void MainWindow::addToRecentFiles(QString const &filePath)
+{
+    QSettings settings;
+    QStringList files = settings.value(QStringLiteral("recentFiles")).toStringList();
+    files.removeAll(filePath);
+    files.prepend(filePath);
+    while (files.size() > MaxRecentFiles)
+        files.removeLast();
+    settings.setValue(QStringLiteral("recentFiles"), files);
+    rebuildRecentFilesMenu();
+}
+
+void MainWindow::rebuildRecentFilesMenu()
+{
+    _recentFilesMenu->clear();
+    const QStringList files = recentFiles();
+
+    for (auto const &filePath : files) {
+        const QString label = QFileInfo(filePath).fileName();
+        QAction *action = _recentFilesMenu->addAction(label);
+        connect(action, &QAction::triggered, this, [this, filePath]() {
+            if (!maybeSave())
+                return;
+            loadWorkflowFromPath(filePath);
+        });
+    }
+
+    _recentFilesMenu->setEnabled(!files.isEmpty());
 }

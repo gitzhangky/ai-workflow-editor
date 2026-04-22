@@ -3,8 +3,10 @@
 #include "app/LanguageManager.hpp"
 
 #include <QMainWindow>
+#include <QStringList>
 
 class QAction;
+class QCloseEvent;
 class InspectorPanel;
 class NodeLibraryListWidget;
 class QDockWidget;
@@ -25,15 +27,24 @@ public:
     void addNodeFromType(QString const &typeKey);
     bool saveWorkflowToPath(QString const &filePath);
     bool loadWorkflowFromPath(QString const &filePath);
+    bool isDirty() const;
+    QStringList recentFiles() const;
 
 protected:
     void changeEvent(QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     NodeLibraryListWidget *createNodeLibrary();
     void populateNodeLibrary();
     void retranslateUi();
     void updateLanguageActions();
+    void markDirty();
+    void clearDirty();
+    void updateWindowTitle();
+    bool maybeSave();
+    void addToRecentFiles(QString const &filePath);
+    void rebuildRecentFilesMenu();
 
     LanguageManager *_languageManager;
     QMenu *_fileMenu;
@@ -41,6 +52,7 @@ private:
     QMenu *_viewMenu;
     QMenu *_settingsMenu;
     QMenu *_languageMenu;
+    QMenu *_recentFilesMenu;
     QToolBar *_primaryToolBar;
     QDockWidget *_nodeLibraryDock;
     QDockWidget *_inspectorDock;
@@ -52,6 +64,8 @@ private:
     QAction *_newAction;
     QAction *_openAction;
     QAction *_saveAction;
+    QAction *_saveAsAction;
+    QAction *_deleteAction;
     QAction *_undoAction;
     QAction *_redoAction;
     QAction *_centerAction;
@@ -62,4 +76,6 @@ private:
     QAction *_languageEnglishAction;
     QToolButton *_languageToolButton;
     QString _currentWorkflowPath;
+    bool _dirty;
+    static constexpr int MaxRecentFiles = 10;
 };

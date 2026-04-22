@@ -60,6 +60,17 @@ private slots:
     void appliesDistinctNodeCardStylesByType();
     void enforcesConnectionRulesBetweenCompatiblePorts();
     void savesAndLoadsWorkflowJson();
+    void tracksDirtyStateOnEdits();
+    void clearsDirtyStateOnSave();
+    void clearsDirtyStateOnLoad();
+    void showsDirtyMarkerInWindowTitle();
+    void showsFileNameInWindowTitleAfterSave();
+    void tracksRecentFilesAcrossSaveAndLoad();
+    void fileMenuContainsSaveAsAndRecentFiles();
+    void deletesSelectedNodeFromCanvas();
+    void deletesSelectedConnectionFromCanvas();
+    void deleteMarksDocumentDirty();
+    void editMenuContainsDeleteAction();
 };
 
 void MainWindowTests::initTestCase()
@@ -700,6 +711,198 @@ void MainWindowTests::savesAndLoadsWorkflowJson()
     QCOMPARE(restoredEditor->selectedNodeProperty("modelName").toString(), QString("demo-model"));
     QCOMPARE(restoredEditor->selectedNodeProperty("temperature").toDouble(), 0.35);
     QCOMPARE(restoredEditor->selectedNodeProperty("maxTokens").toInt(), 4096);
+}
+
+void MainWindowTests::tracksDirtyStateOnEdits()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    QVERIFY(!window.isDirty());
+
+    window.addNodeFromType("prompt");
+    QVERIFY(window.isDirty());
+}
+
+void MainWindowTests::clearsDirtyStateOnSave()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    window.addNodeFromType("prompt");
+    QVERIFY(window.isDirty());
+
+    QVERIFY(window.saveWorkflowToPath(QDir(tempDir.path()).filePath("test.json")));
+    QVERIFY(!window.isDirty());
+}
+
+void MainWindowTests::clearsDirtyStateOnLoad()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    window.addNodeFromType("prompt");
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    window.addNodeFromType("llm");
+    QVERIFY(window.isDirty());
+
+    QVERIFY(window.loadWorkflowFromPath(workflowPath));
+    QVERIFY(!window.isDirty());
+}
+
+void MainWindowTests::showsDirtyMarkerInWindowTitle()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    const QString cleanTitle = window.windowTitle();
+    QVERIFY(!cleanTitle.startsWith("*"));
+
+    window.addNodeFromType("prompt");
+    QVERIFY(window.windowTitle().startsWith("*"));
+}
+
+void MainWindowTests::showsFileNameInWindowTitleAfterSave()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    window.addNodeFromType("prompt");
+    QVERIFY(window.saveWorkflowToPath(QDir(tempDir.path()).filePath("my_flow.json")));
+
+    QVERIFY(window.windowTitle().contains("my_flow.json"));
+    QVERIFY(!window.windowTitle().startsWith("*"));
+}
+
+void MainWindowTests::tracksRecentFilesAcrossSaveAndLoad()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    QVERIFY(window.recentFiles().isEmpty());
+
+    const QString path1 = QDir(tempDir.path()).filePath("flow1.json");
+    const QString path2 = QDir(tempDir.path()).filePath("flow2.json");
+
+    window.addNodeFromType("prompt");
+    QVERIFY(window.saveWorkflowToPath(path1));
+
+    QCOMPARE(window.recentFiles().size(), 1);
+    QCOMPARE(window.recentFiles().first(), path1);
+
+    window.addNodeFromType("llm");
+    QVERIFY(window.saveWorkflowToPath(path2));
+
+    QCOMPARE(window.recentFiles().size(), 2);
+    QCOMPARE(window.recentFiles().first(), path2);
+}
+
+void MainWindowTests::fileMenuContainsSaveAsAndRecentFiles()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *fileMenu = window.findChild<QMenu *>("fileMenu");
+    QVERIFY(fileMenu != nullptr);
+
+    bool hasSaveAs = false;
+    bool hasRecentFiles = false;
+    for (auto *action : fileMenu->actions()) {
+        if (action->objectName() == "saveAsAction")
+            hasSaveAs = true;
+        if (action->menu() != nullptr && action->menu()->objectName() == "recentFilesMenu")
+            hasRecentFiles = true;
+    }
+
+    QVERIFY(hasSaveAs);
+    QVERIFY(hasRecentFiles);
+}
+
+void MainWindowTests::deletesSelectedNodeFromCanvas()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto nodeA = editor->createNode("prompt");
+    const auto nodeB = editor->createNode("llm");
+    QCOMPARE(editor->nodeCount(), 2);
+
+    editor->selectNode(nodeA);
+    editor->deleteSelectedNodes();
+
+    QCOMPARE(editor->nodeCount(), 1);
+    QCOMPARE(editor->workflowDisplayNames().size(), 1);
+}
+
+void MainWindowTests::deletesSelectedConnectionFromCanvas()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(editor->connectNodes(startNode, 0, promptNode, 0));
+    QCOMPARE(editor->connectionCount(), 1);
+
+    editor->deleteSelectedConnections();
+    QCOMPARE(editor->nodeCount(), 2);
+}
+
+void MainWindowTests::deleteMarksDocumentDirty()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    editor->createNode("prompt");
+    QVERIFY(window.saveWorkflowToPath(QDir(tempDir.path()).filePath("test.json")));
+    QVERIFY(!window.isDirty());
+
+    editor->selectNode(editor->findNodeIdByDisplayName(QString::fromUtf8("提示词")));
+    editor->deleteSelectedNodes();
+    QVERIFY(window.isDirty());
+}
+
+void MainWindowTests::editMenuContainsDeleteAction()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editMenu = window.findChild<QMenu *>("editMenu");
+    QVERIFY(editMenu != nullptr);
+
+    bool hasDelete = false;
+    for (auto *action : editMenu->actions()) {
+        if (action->objectName() == "deleteAction")
+            hasDelete = true;
+    }
+    QVERIFY(hasDelete);
 }
 
 QTEST_MAIN(MainWindowTests)
