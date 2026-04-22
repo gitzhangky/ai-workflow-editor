@@ -7,6 +7,7 @@
 #include <QLineEdit>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStyle>
 #include <QTextEdit>
 #include <QVBoxLayout>
 
@@ -33,6 +34,7 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     , _typeBadgeLabel(new QLabel(this))
     , _typeSummaryLabel(new QLabel(this))
     , _sectionTitleLabel(new QLabel(this))
+    , _validationLabel(new QLabel(this))
     , _emptyStateLabel(new QLabel(this))
     , _displayNameLabel(new QLabel(this))
     , _descriptionLabel(new QLabel(this))
@@ -69,10 +71,13 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     _typeBadgeLabel->setObjectName("inspectorTypeBadgeLabel");
     _typeSummaryLabel->setObjectName("inspectorTypeSummaryLabel");
     _sectionTitleLabel->setObjectName("inspectorSectionTitleLabel");
+    _validationLabel->setObjectName("inspectorValidationLabel");
+    _validationLabel->setWordWrap(true);
     _emptyStateLabel->setObjectName("inspectorEmptyStateLabel");
     layout->addWidget(_typeBadgeLabel);
     layout->addWidget(_typeSummaryLabel);
     layout->addWidget(_sectionTitleLabel);
+    layout->addWidget(_validationLabel);
 
     auto *baseFormLayout = new QFormLayout();
     baseFormLayout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -194,6 +199,12 @@ void InspectorPanel::clearSelection()
     _typeBadgeLabel->clear();
     _typeSummaryLabel->clear();
     _sectionTitleLabel->clear();
+    _validationState.clear();
+    _validationLabel->clear();
+    _validationLabel->setVisible(false);
+    _validationLabel->setProperty("severity", QString());
+    _validationLabel->style()->unpolish(_validationLabel);
+    _validationLabel->style()->polish(_validationLabel);
 
     for (auto *widget : {static_cast<QWidget *>(_displayNameEdit),
                          static_cast<QWidget *>(_descriptionEdit),
@@ -211,7 +222,14 @@ void InspectorPanel::clearSelection()
     setTypeSpecificSectionVisible(QString());
 }
 
-    void InspectorPanel::setSelectedNode(QString const &typeKey,
+void InspectorPanel::setValidationFeedback(QString const &state, QString const &message)
+{
+    _validationState = state;
+    _validationLabel->setText(message);
+    updateValidationLabel();
+}
+
+void InspectorPanel::setSelectedNode(QString const &typeKey,
                                      QString const &displayName,
                                      QString const &description,
                                      QVariantMap const &properties)
@@ -269,6 +287,20 @@ void InspectorPanel::retranslateUi()
         _typeSummaryLabel->setText(typeSummary(_currentTypeKey));
         _sectionTitleLabel->setText(sectionTitle(_currentTypeKey));
     }
+
+    updateValidationLabel();
+}
+
+void InspectorPanel::updateValidationLabel()
+{
+    const bool showValidation =
+        (_validationState == QStringLiteral("warning") || _validationState == QStringLiteral("error"))
+        && !_validationLabel->text().trimmed().isEmpty();
+
+    _validationLabel->setProperty("severity", showValidation ? _validationState : QString());
+    _validationLabel->style()->unpolish(_validationLabel);
+    _validationLabel->style()->polish(_validationLabel);
+    _validationLabel->setVisible(showValidation);
 }
 
 void InspectorPanel::setTypeSpecificSectionVisible(QString const &typeKey)

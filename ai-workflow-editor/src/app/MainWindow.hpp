@@ -11,6 +11,7 @@ class InspectorPanel;
 class NodeLibraryListWidget;
 class QDockWidget;
 class QEvent;
+class QLabel;
 class QLineEdit;
 class QMenu;
 class QToolBar;
@@ -24,6 +25,7 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(LanguageManager *languageManager, QWidget *parent = nullptr);
+    ~MainWindow() override;
     void addNodeFromType(QString const &typeKey);
     bool saveWorkflowToPath(QString const &filePath);
     bool loadWorkflowFromPath(QString const &filePath);
@@ -42,6 +44,7 @@ private:
     void markDirty();
     void clearDirty();
     void updateWindowTitle();
+    void updateSelectionValidationSummary(QString const &state, QString const &message);
     bool maybeSave();
     void addToRecentFiles(QString const &filePath);
     void rebuildRecentFilesMenu();
@@ -61,11 +64,13 @@ private:
     QLineEdit *_nodeLibrarySearchEdit;
     InspectorPanel *_inspectorPanel;
     QtNodesEditorWidget *_editorWidget;
+    QLabel *_selectionValidationSummaryLabel;
     QAction *_newAction;
     QAction *_openAction;
     QAction *_saveAction;
     QAction *_saveAsAction;
     QAction *_deleteAction;
+    QAction *_selectAllAction;
     QAction *_undoAction;
     QAction *_redoAction;
     QAction *_centerAction;
@@ -76,6 +81,7 @@ private:
     QAction *_languageEnglishAction;
     QToolButton *_languageToolButton;
     QString _currentWorkflowPath;
+    QString _currentSelectedNodeDisplayName;
     bool _dirty;
     static constexpr int MaxRecentFiles = 10;
 };

@@ -6,6 +6,8 @@
 #include "qtnodes/StyledNodePainter.hpp"
 
 #include <QtNodes/internal/ConnectionGraphicsObject.hpp>
+#include <QtNodes/internal/locateNode.hpp>
+#include <QtNodes/internal/NodeConnectionInteraction.hpp>
 #include <QtNodes/ConnectionStyle>
 #include <QtNodes/DataFlowGraphModel>
 #include <QtNodes/DataFlowGraphicsScene>
@@ -27,11 +29,274 @@
 #include <QJsonObject>
 #include <QMenu>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QPointF>
 #include <QShortcut>
+#include <QTimer>
+#include <QUndoCommand>
+#include <QUndoStack>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <unordered_set>
+
+class NodeCreateCommand : public QUndoCommand
+{
+public:
+    NodeCreateCommand(QtNodesEditorWidget *editor, QString typeKey, QPointF scenePosition)
+        : _editor(editor)
+        , _typeKey(std::move(typeKey))
+        , _scenePosition(scenePosition)
+    {}
+
+    QtNodes::NodeId nodeId() const
+    {
+        return _snapshot.has_value() ? _snapshot->nodeId : QtNodes::InvalidNodeId;
+    }
+
+    void undo() override
+    {
+        if (_editor == nullptr || !_snapshot.has_value())
+            return;
+
+        _snapshot = _editor->snapshotNode(_snapshot->nodeId);
+        _editor->deleteNodeInternal(_snapshot->nodeId);
+        _editor->refreshSelectedNodeState();
+        Q_EMIT _editor->workflowModified();
+    }
+
+    void redo() override
+    {
+        if (_editor == nullptr)
+            return;
+
+        if (_snapshot.has_value())
+            _snapshot->nodeId = _editor->restoreNodeInternal(*_snapshot);
+        else {
+            const auto nodeId = _editor->createNodeInternal(_typeKey, _scenePosition);
+            _snapshot = _editor->snapshotNode(nodeId);
+        }
+
+        _editor->selectNode(_snapshot->nodeId);
+        Q_EMIT _editor->workflowModified();
+    }
+
+private:
+    QtNodesEditorWidget *_editor;
+    QString _typeKey;
+    QPointF _scenePosition;
+    std::optional<QtNodesEditorWidget::NodeSnapshot> _snapshot;
+};
+
+class NodeDeleteSelectionCommand : public QUndoCommand
+{
+public:
+    explicit NodeDeleteSelectionCommand(QtNodesEditorWidget *editor, bool includeSelectedNodes)
+        : _editor(editor)
+    {
+        if (_editor == nullptr)
+            return;
+
+        if (includeSelectedNodes) {
+            for (auto const nodeId : _editor->selectedNodeIds()) {
+                _nodeSnapshots.push_back(_editor->snapshotNode(nodeId));
+                for (auto const &connectionId : _editor->_graphModel->allConnectionIds(nodeId))
+                    _connectionIds.insert(connectionId);
+            }
+        }
+
+        for (auto *item : _editor->_scene->selectedItems()) {
+            auto *connectionObject = dynamic_cast<QtNodes::ConnectionGraphicsObject *>(item);
+            if (connectionObject != nullptr)
+                _connectionIds.insert(connectionObject->connectionId());
+        }
+
+        if (_nodeSnapshots.empty() && _connectionIds.empty())
+            setObsolete(true);
+    }
+
+    void undo() override
+    {
+        if (_editor == nullptr)
+            return;
+
+        for (auto const &snapshot : _nodeSnapshots)
+            _editor->restoreNodeInternal(snapshot);
+
+        for (auto const &connectionId : _connectionIds) {
+            if (!_editor->_graphModel->connectionExists(connectionId)
+                && _editor->_graphModel->connectionPossible(connectionId)) {
+                _editor->_graphModel->addConnection(connectionId);
+            }
+        }
+
+        if (!_nodeSnapshots.empty())
+            _editor->selectNode(_nodeSnapshots.front().nodeId);
+        else
+            _editor->refreshSelectedNodeState();
+
+        Q_EMIT _editor->workflowModified();
+    }
+
+    void redo() override
+    {
+        if (_editor == nullptr)
+            return;
+
+        for (auto const &connectionId : _connectionIds) {
+            if (_editor->_graphModel->connectionExists(connectionId))
+                _editor->_graphModel->deleteConnection(connectionId);
+        }
+
+        for (auto const &snapshot : _nodeSnapshots) {
+            if (_editor->_graphModel->nodeExists(snapshot.nodeId))
+                _editor->deleteNodeInternal(snapshot.nodeId);
+        }
+
+        _editor->refreshSelectedNodeState();
+        Q_EMIT _editor->workflowModified();
+    }
+
+private:
+    QtNodesEditorWidget *_editor;
+    std::vector<QtNodesEditorWidget::NodeSnapshot> _nodeSnapshots;
+    std::unordered_set<QtNodes::ConnectionId> _connectionIds;
+};
+
+class NodeDisplayNameEditCommand : public QUndoCommand
+{
+public:
+    NodeDisplayNameEditCommand(QtNodesEditorWidget *editor,
+                               QtNodes::NodeId nodeId,
+                               QString oldValue,
+                               QString newValue)
+        : _editor(editor)
+        , _nodeId(nodeId)
+        , _oldValue(std::move(oldValue))
+        , _newValue(std::move(newValue))
+    {}
+
+    int id() const override { return 1001; }
+
+    bool mergeWith(QUndoCommand const *other) override
+    {
+        auto const *command = dynamic_cast<NodeDisplayNameEditCommand const *>(other);
+        if (command == nullptr || command->_nodeId != _nodeId)
+            return false;
+
+        _newValue = command->_newValue;
+        return true;
+    }
+
+    void undo() override
+    {
+        if (_editor != nullptr)
+            _editor->setNodeDisplayNameInternal(_nodeId, _oldValue);
+    }
+
+    void redo() override
+    {
+        if (_editor != nullptr)
+            _editor->setNodeDisplayNameInternal(_nodeId, _newValue);
+    }
+
+private:
+    QtNodesEditorWidget *_editor;
+    QtNodes::NodeId _nodeId;
+    QString _oldValue;
+    QString _newValue;
+};
+
+class NodeDescriptionEditCommand : public QUndoCommand
+{
+public:
+    NodeDescriptionEditCommand(QtNodesEditorWidget *editor,
+                               QtNodes::NodeId nodeId,
+                               QString oldValue,
+                               QString newValue)
+        : _editor(editor)
+        , _nodeId(nodeId)
+        , _oldValue(std::move(oldValue))
+        , _newValue(std::move(newValue))
+    {}
+
+    int id() const override { return 1002; }
+
+    bool mergeWith(QUndoCommand const *other) override
+    {
+        auto const *command = dynamic_cast<NodeDescriptionEditCommand const *>(other);
+        if (command == nullptr || command->_nodeId != _nodeId)
+            return false;
+
+        _newValue = command->_newValue;
+        return true;
+    }
+
+    void undo() override
+    {
+        if (_editor != nullptr)
+            _editor->setNodeDescriptionInternal(_nodeId, _oldValue);
+    }
+
+    void redo() override
+    {
+        if (_editor != nullptr)
+            _editor->setNodeDescriptionInternal(_nodeId, _newValue);
+    }
+
+private:
+    QtNodesEditorWidget *_editor;
+    QtNodes::NodeId _nodeId;
+    QString _oldValue;
+    QString _newValue;
+};
+
+class NodePropertyEditCommand : public QUndoCommand
+{
+public:
+    NodePropertyEditCommand(QtNodesEditorWidget *editor,
+                            QtNodes::NodeId nodeId,
+                            QString propertyKey,
+                            QVariant oldValue,
+                            QVariant newValue)
+        : _editor(editor)
+        , _nodeId(nodeId)
+        , _propertyKey(std::move(propertyKey))
+        , _oldValue(std::move(oldValue))
+        , _newValue(std::move(newValue))
+    {}
+
+    int id() const override { return 1003; }
+
+    bool mergeWith(QUndoCommand const *other) override
+    {
+        auto const *command = dynamic_cast<NodePropertyEditCommand const *>(other);
+        if (command == nullptr || command->_nodeId != _nodeId || command->_propertyKey != _propertyKey)
+            return false;
+
+        _newValue = command->_newValue;
+        return true;
+    }
+
+    void undo() override
+    {
+        if (_editor != nullptr)
+            _editor->setNodePropertyInternal(_nodeId, _propertyKey, _oldValue);
+    }
+
+    void redo() override
+    {
+        if (_editor != nullptr)
+            _editor->setNodePropertyInternal(_nodeId, _propertyKey, _newValue);
+    }
+
+private:
+    QtNodesEditorWidget *_editor;
+    QtNodes::NodeId _nodeId;
+    QString _propertyKey;
+    QVariant _oldValue;
+    QVariant _newValue;
+};
 
 QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
     : QWidget(parent)
@@ -41,6 +306,7 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
     , _view(new QtNodes::GraphicsView(_scene))
     , _dropPreview(new QFrame(_view->viewport()))
     , _selectedNodeId(QtNodes::InvalidNodeId)
+    , _connectionFeedbackActive(false)
 {
     setObjectName("workflowCanvas");
     applyWorkbenchStyles();
@@ -64,6 +330,7 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
     connect(_scene, &QtNodes::BasicGraphicsScene::nodeSelected, this, [this](QtNodes::NodeId nodeId) {
         handleNodeSelected(nodeId);
     });
+    connect(&_scene->undoStack(), &QUndoStack::cleanChanged, this, &QtNodesEditorWidget::cleanStateChanged);
 
     auto *deleteShortcut = new QShortcut(QKeySequence::Delete, this);
     connect(deleteShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
@@ -116,6 +383,14 @@ bool QtNodesEditorWidget::eventFilter(QObject *watched, QEvent *event)
         case QEvent::DragLeave:
             clearDropPreview();
             return false;
+        case QEvent::MouseMove:
+            updateConnectionFeedback(static_cast<QMouseEvent *>(event)->pos());
+            return false;
+        case QEvent::MouseButtonRelease:
+            if (_connectionFeedbackActive) {
+                QTimer::singleShot(0, this, [this]() { clearConnectionFeedback(); });
+            }
+            return false;
         default:
             break;
         }
@@ -125,6 +400,13 @@ bool QtNodesEditorWidget::eventFilter(QObject *watched, QEvent *event)
 }
 
 QtNodes::NodeId QtNodesEditorWidget::createNode(QString const &typeKey, QPointF const &scenePosition)
+{
+    auto *command = new NodeCreateCommand(this, typeKey, scenePosition);
+    _scene->undoStack().push(command);
+    return command->nodeId();
+}
+
+QtNodes::NodeId QtNodesEditorWidget::createNodeInternal(QString const &typeKey, QPointF const &scenePosition)
 {
     auto const *definition = _builtInNodeRegistry.find(typeKey);
     if (definition == nullptr)
@@ -151,9 +433,31 @@ QtNodes::NodeId QtNodesEditorWidget::createNode(QString const &typeKey, QPointF 
     }
     applyNodeStyle(nodeId, definition->typeKey);
 
-    selectNode(nodeId);
-    Q_EMIT workflowModified();
     return nodeId;
+}
+
+QtNodes::NodeId QtNodesEditorWidget::restoreNodeInternal(NodeSnapshot const &snapshot)
+{
+    _graphModel->loadNode(snapshot.nodeJson);
+    _nodeStates.insert(snapshot.nodeId, snapshot.state);
+
+    if (auto *model = _graphModel->delegateModel<StaticNodeDelegateModel>(snapshot.nodeId); model != nullptr)
+        model->setDisplayName(snapshot.state.displayName);
+
+    applyNodeStyle(snapshot.nodeId, snapshot.state.typeKey);
+    return snapshot.nodeId;
+}
+
+bool QtNodesEditorWidget::deleteNodeInternal(QtNodes::NodeId nodeId)
+{
+    if (!_graphModel->nodeExists(nodeId))
+        return false;
+
+    _nodeStates.remove(nodeId);
+    _graphModel->deleteNode(nodeId);
+    if (_selectedNodeId == nodeId)
+        _selectedNodeId = QtNodes::InvalidNodeId;
+    return true;
 }
 
 bool QtNodesEditorWidget::connectNodes(QtNodes::NodeId outNodeId,
@@ -167,6 +471,7 @@ bool QtNodesEditorWidget::connectNodes(QtNodes::NodeId outNodeId,
         return false;
 
     _graphModel->addConnection(connectionId);
+    markCurrentStateDirty();
     Q_EMIT workflowModified();
     return true;
 }
@@ -187,6 +492,8 @@ void QtNodesEditorWidget::selectNode(QtNodes::NodeId nodeId)
 
 void QtNodesEditorWidget::clearWorkflow()
 {
+    _scene->undoStack().clear();
+
     const auto nodeIds = sortedNodeIds();
     for (auto it = nodeIds.crbegin(); it != nodeIds.crend(); ++it) {
         _graphModel->deleteNode(*it);
@@ -201,36 +508,22 @@ void QtNodesEditorWidget::clearWorkflow()
 
 void QtNodesEditorWidget::deleteSelectedNodes()
 {
-    const auto ids = selectedNodeIds();
-    if (ids.empty())
+    auto *command = new NodeDeleteSelectionCommand(this, true);
+    if (command->isObsolete()) {
+        delete command;
         return;
-
-    for (auto const nodeId : ids) {
-        _nodeStates.remove(nodeId);
-        _graphModel->deleteNode(nodeId);
     }
-
-    _selectedNodeId = QtNodes::InvalidNodeId;
-    Q_EMIT selectionCleared();
-    Q_EMIT workflowModified();
+    _scene->undoStack().push(command);
 }
 
 void QtNodesEditorWidget::deleteSelectedConnections()
 {
-    const auto items = _scene->selectedItems();
-    bool deleted = false;
-
-    for (auto *item : items) {
-        auto *connectionObject = dynamic_cast<QtNodes::ConnectionGraphicsObject *>(item);
-        if (connectionObject == nullptr)
-            continue;
-
-        _graphModel->deleteConnection(connectionObject->connectionId());
-        deleted = true;
+    auto *command = new NodeDeleteSelectionCommand(this, false);
+    if (command->isObsolete()) {
+        delete command;
+        return;
     }
-
-    if (deleted)
-        Q_EMIT workflowModified();
+    _scene->undoStack().push(command);
 }
 
 void QtNodesEditorWidget::deleteSelection()
@@ -242,6 +535,33 @@ void QtNodesEditorWidget::deleteSelection()
     }
 
     deleteSelectedConnections();
+}
+
+void QtNodesEditorWidget::selectAllNodes()
+{
+    _scene->clearSelection();
+    for (auto const nodeId : sortedNodeIds()) {
+        if (auto *obj = _scene->nodeGraphicsObject(nodeId); obj != nullptr)
+            obj->setSelected(true);
+    }
+}
+
+void QtNodesEditorWidget::centerSelection()
+{
+    if (_scene->selectedItems().isEmpty())
+        _view->zoomFitAll();
+    else
+        _view->zoomFitSelected();
+}
+
+void QtNodesEditorWidget::undo()
+{
+    _scene->undoStack().undo();
+}
+
+void QtNodesEditorWidget::redo()
+{
+    _scene->undoStack().redo();
 }
 
 std::vector<QtNodes::NodeId> QtNodesEditorWidget::selectedNodeIds() const
@@ -337,6 +657,36 @@ QVariantMap QtNodesEditorWidget::nodeStyle(QtNodes::NodeId nodeId) const
     return _graphModel->nodeData(nodeId, QtNodes::NodeRole::Style).toMap();
 }
 
+QString QtNodesEditorWidget::nodeValidationState(QtNodes::NodeId nodeId) const
+{
+    if (!_graphModel->nodeExists(nodeId))
+        return {};
+
+    const auto state =
+        _graphModel->nodeData(nodeId, QtNodes::NodeRole::ValidationState).value<QtNodes::NodeValidationState>();
+
+    switch (state._state) {
+    case QtNodes::NodeValidationState::State::Valid:
+        return QStringLiteral("valid");
+    case QtNodes::NodeValidationState::State::Warning:
+        return QStringLiteral("warning");
+    case QtNodes::NodeValidationState::State::Error:
+        return QStringLiteral("error");
+    }
+
+    return {};
+}
+
+QString QtNodesEditorWidget::nodeValidationMessage(QtNodes::NodeId nodeId) const
+{
+    if (!_graphModel->nodeExists(nodeId))
+        return {};
+
+    return _graphModel->nodeData(nodeId, QtNodes::NodeRole::ValidationState)
+        .value<QtNodes::NodeValidationState>()
+        ._stateMessage;
+}
+
 QString QtNodesEditorWidget::selectedNodeDisplayName() const
 {
     auto state = selectedState();
@@ -387,9 +737,48 @@ QtNodes::NodeId QtNodesEditorWidget::findNodeIdByDisplayName(QString const &disp
     return QtNodes::InvalidNodeId;
 }
 
-void QtNodesEditorWidget::setSelectedNodeDisplayName(QString const &displayName)
+QPointF QtNodesEditorWidget::portScenePosition(QtNodes::NodeId nodeId,
+                                               QtNodes::PortType portType,
+                                               QtNodes::PortIndex portIndex) const
 {
-    auto nodeStateIt = _nodeStates.find(_selectedNodeId);
+    if (!_graphModel->nodeExists(nodeId))
+        return {};
+
+    auto *nodeGraphicsObject = _scene->nodeGraphicsObject(nodeId);
+    if (nodeGraphicsObject == nullptr)
+        return {};
+
+    return _scene->nodeGeometry().portScenePosition(nodeId, portType, portIndex, nodeGraphicsObject->sceneTransform());
+}
+
+bool QtNodesEditorWidget::canUndo() const
+{
+    return _scene->undoStack().canUndo();
+}
+
+bool QtNodesEditorWidget::canRedo() const
+{
+    return _scene->undoStack().canRedo();
+}
+
+bool QtNodesEditorWidget::isClean() const
+{
+    return _scene->undoStack().isClean();
+}
+
+void QtNodesEditorWidget::markCurrentStateClean()
+{
+    _scene->undoStack().setClean();
+}
+
+void QtNodesEditorWidget::markCurrentStateDirty()
+{
+    _scene->undoStack().resetClean();
+}
+
+void QtNodesEditorWidget::setNodeDisplayNameInternal(QtNodes::NodeId nodeId, QString const &displayName)
+{
+    auto nodeStateIt = _nodeStates.find(nodeId);
     if (nodeStateIt == _nodeStates.end())
         return;
 
@@ -397,15 +786,97 @@ void QtNodesEditorWidget::setSelectedNodeDisplayName(QString const &displayName)
     nodeStateIt->displayName = displayName;
     nodeStateIt->displayNameCustomized = definition != nullptr && displayName != definition->displayName;
 
-    if (auto *model = _graphModel->delegateModel<StaticNodeDelegateModel>(_selectedNodeId); model != nullptr) {
+    if (auto *model = _graphModel->delegateModel<StaticNodeDelegateModel>(nodeId); model != nullptr)
         model->setDisplayName(displayName);
+
+    if (_selectedNodeId == nodeId) {
+        Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
+                                   nodeStateIt->displayName,
+                                   nodeStateIt->description,
+                                   nodeStateIt->properties);
+        emitSelectedNodeValidation();
     }
 
-    Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
-                               nodeStateIt->displayName,
-                               nodeStateIt->description,
-                               nodeStateIt->properties);
     Q_EMIT workflowModified();
+}
+
+void QtNodesEditorWidget::setNodeDescriptionInternal(QtNodes::NodeId nodeId, QString const &description)
+{
+    auto nodeStateIt = _nodeStates.find(nodeId);
+    if (nodeStateIt == _nodeStates.end())
+        return;
+
+    auto const *definition = _builtInNodeRegistry.find(nodeStateIt->typeKey);
+    nodeStateIt->description = description;
+    nodeStateIt->descriptionCustomized = definition != nullptr && description != definition->description;
+
+    if (_selectedNodeId == nodeId) {
+        Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
+                                   nodeStateIt->displayName,
+                                   nodeStateIt->description,
+                                   nodeStateIt->properties);
+        emitSelectedNodeValidation();
+    }
+
+    Q_EMIT workflowModified();
+}
+
+void QtNodesEditorWidget::setNodePropertyInternal(QtNodes::NodeId nodeId,
+                                                  QString const &propertyKey,
+                                                  QVariant const &value)
+{
+    auto nodeStateIt = _nodeStates.find(nodeId);
+    if (nodeStateIt == _nodeStates.end())
+        return;
+
+    nodeStateIt->properties.insert(propertyKey, value);
+    applyNodeStyle(nodeId, nodeStateIt->typeKey);
+
+    if (_selectedNodeId == nodeId) {
+        Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
+                                   nodeStateIt->displayName,
+                                   nodeStateIt->description,
+                                   nodeStateIt->properties);
+        emitSelectedNodeValidation();
+    }
+
+    Q_EMIT workflowModified();
+}
+
+QtNodesEditorWidget::NodeSnapshot QtNodesEditorWidget::snapshotNode(QtNodes::NodeId nodeId) const
+{
+    return NodeSnapshot{nodeId, _graphModel->saveNode(nodeId), _nodeStates.value(nodeId)};
+}
+
+void QtNodesEditorWidget::refreshSelectedNodeState()
+{
+    if (_selectedNodeId != QtNodes::InvalidNodeId && _graphModel->nodeExists(_selectedNodeId)) {
+        auto nodeStateIt = _nodeStates.find(_selectedNodeId);
+        if (nodeStateIt != _nodeStates.end()) {
+            Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
+                                       nodeStateIt->displayName,
+                                       nodeStateIt->description,
+                                       nodeStateIt->properties);
+            emitSelectedNodeValidation();
+            return;
+        }
+    }
+
+    _selectedNodeId = QtNodes::InvalidNodeId;
+    Q_EMIT selectionCleared();
+}
+
+void QtNodesEditorWidget::setSelectedNodeDisplayName(QString const &displayName)
+{
+    auto nodeStateIt = _nodeStates.find(_selectedNodeId);
+    if (nodeStateIt == _nodeStates.end())
+        return;
+
+    if (nodeStateIt->displayName == displayName)
+        return;
+
+    _scene->undoStack().push(
+        new NodeDisplayNameEditCommand(this, _selectedNodeId, nodeStateIt->displayName, displayName));
 }
 
 void QtNodesEditorWidget::setSelectedNodeDescription(QString const &description)
@@ -414,14 +885,11 @@ void QtNodesEditorWidget::setSelectedNodeDescription(QString const &description)
     if (nodeStateIt == _nodeStates.end())
         return;
 
-    auto const *definition = _builtInNodeRegistry.find(nodeStateIt->typeKey);
-    nodeStateIt->description = description;
-    nodeStateIt->descriptionCustomized = definition != nullptr && description != definition->description;
-    Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
-                               nodeStateIt->displayName,
-                               nodeStateIt->description,
-                               nodeStateIt->properties);
-    Q_EMIT workflowModified();
+    if (nodeStateIt->description == description)
+        return;
+
+    _scene->undoStack().push(
+        new NodeDescriptionEditCommand(this, _selectedNodeId, nodeStateIt->description, description));
 }
 
 void QtNodesEditorWidget::setSelectedNodeProperty(QString const &propertyKey, QVariant const &value)
@@ -430,12 +898,11 @@ void QtNodesEditorWidget::setSelectedNodeProperty(QString const &propertyKey, QV
     if (nodeStateIt == _nodeStates.end())
         return;
 
-    nodeStateIt->properties.insert(propertyKey, value);
-    Q_EMIT selectedNodeChanged(nodeStateIt->typeKey,
-                               nodeStateIt->displayName,
-                               nodeStateIt->description,
-                               nodeStateIt->properties);
-    Q_EMIT workflowModified();
+    if (nodeStateIt->properties.value(propertyKey) == value)
+        return;
+
+    _scene->undoStack().push(
+        new NodePropertyEditCommand(this, _selectedNodeId, propertyKey, nodeStateIt->properties.value(propertyKey), value));
 }
 
 bool QtNodesEditorWidget::saveWorkflow(QString const &filePath) const
@@ -533,6 +1000,7 @@ bool QtNodesEditorWidget::loadWorkflow(QString const &filePath)
         if (auto *model = _graphModel->delegateModel<StaticNodeDelegateModel>(nodeId); model != nullptr) {
             model->setDisplayName(_nodeStates[nodeId].displayName);
         }
+        applyNodeStyle(nodeId, _nodeStates[nodeId].typeKey);
     }
 
     const auto connections = root["connections"].toArray();
@@ -643,9 +1111,15 @@ void QtNodesEditorWidget::applyNodeStyle(QtNodes::NodeId nodeId, QString const &
     if (model == nullptr)
         return;
 
+    const auto nodeStateIt = _nodeStates.constFind(nodeId);
+    const QVariantMap properties = nodeStateIt != _nodeStates.cend() ? nodeStateIt->properties : QVariantMap();
+    const QVariantMap styleMap = nodeStyleForType(typeKey, properties);
+    const auto validationState = validationStateFor(typeKey, properties);
+
     QtNodes::NodeStyle style;
-    style.loadJson(QJsonObject::fromVariantMap(nodeStyleForType(typeKey)));
+    style.loadJson(QJsonObject::fromVariantMap(styleMap));
     model->setNodeStyle(style);
+    _graphModel->setNodeData(nodeId, QtNodes::NodeRole::ValidationState, QVariant::fromValue(validationState));
     if (auto *nodeGraphicsObject = _scene->nodeGraphicsObject(nodeId); nodeGraphicsObject != nullptr) {
         if (nodeGraphicsObject->graphicsEffect() != nullptr)
             nodeGraphicsObject->setGraphicsEffect(nullptr);
@@ -653,7 +1127,7 @@ void QtNodesEditorWidget::applyNodeStyle(QtNodes::NodeId nodeId, QString const &
     Q_EMIT model->requestNodeUpdate();
 }
 
-QVariantMap QtNodesEditorWidget::nodeStyleForType(QString const &typeKey) const
+QVariantMap QtNodesEditorWidget::nodeStyleForType(QString const &typeKey, QVariantMap const &properties) const
 {
     QtNodes::NodeStyle style;
     style.NormalBoundaryColor = QColor(QStringLiteral("#C8BBAB"));
@@ -713,6 +1187,50 @@ QVariantMap QtNodesEditorWidget::nodeStyleForType(QString const &typeKey) const
     return style.toJson().toVariantMap();
 }
 
+QtNodes::NodeValidationState QtNodesEditorWidget::validationStateFor(QString const &typeKey,
+                                                                     QVariantMap const &properties) const
+{
+    auto const trimmed = [&](QString const &key) { return properties.value(key).toString().trimmed(); };
+    QtNodes::NodeValidationState state;
+
+    if (typeKey == QStringLiteral("prompt")) {
+        if (trimmed(QStringLiteral("userPromptTemplate")).isEmpty()) {
+            state._state = QtNodes::NodeValidationState::State::Warning;
+            state._stateMessage = tr("Prompt template is empty.");
+        }
+        return state;
+    }
+
+    if (typeKey == QStringLiteral("llm")) {
+        if (trimmed(QStringLiteral("modelName")).isEmpty()) {
+            state._state = QtNodes::NodeValidationState::State::Warning;
+            state._stateMessage = tr("Model name is required.");
+        }
+        return state;
+    }
+
+    if (typeKey == QStringLiteral("tool")) {
+        if (trimmed(QStringLiteral("toolName")).isEmpty()) {
+            state._state = QtNodes::NodeValidationState::State::Warning;
+            state._stateMessage = tr("Tool name is required.");
+            return state;
+        }
+
+        const QString inputMapping = trimmed(QStringLiteral("inputMapping"));
+        if (!inputMapping.isEmpty()) {
+            QJsonParseError parseError;
+            const auto document = QJsonDocument::fromJson(inputMapping.toUtf8(), &parseError);
+            if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                state._state = QtNodes::NodeValidationState::State::Error;
+                state._stateMessage = tr("Input mapping must be a valid JSON object.");
+                return state;
+            }
+        }
+    }
+
+    return state;
+}
+
 void QtNodesEditorWidget::updateDropPreview(QString const &typeKey,
                                             QPoint const &position,
                                             bool viewportCoordinates)
@@ -745,6 +1263,45 @@ void QtNodesEditorWidget::clearDropPreview()
     Q_EMIT dropPreviewMessageChanged(tr("Ready"));
 }
 
+void QtNodesEditorWidget::updateConnectionFeedback(QPoint const &viewportPoint)
+{
+    auto *draftConnection = draftConnectionGraphicsObject();
+    if (draftConnection == nullptr) {
+        clearConnectionFeedback();
+        return;
+    }
+
+    const QPointF scenePoint = _view->mapToScene(viewportPoint);
+    auto *nodeGraphicsObject = QtNodes::locateNodeAt(scenePoint, *_scene, _view->transform());
+    if (nodeGraphicsObject == nullptr) {
+        _connectionFeedbackActive = true;
+        Q_EMIT dropPreviewMessageChanged(tr("Drag to a compatible port."));
+        return;
+    }
+
+    QtNodes::NodeConnectionInteraction interaction(*nodeGraphicsObject, *draftConnection, *_scene);
+    QtNodes::PortIndex portIndex = QtNodes::InvalidPortIndex;
+    if (interaction.canConnect(&portIndex)) {
+        _connectionFeedbackActive = true;
+        Q_EMIT dropPreviewMessageChanged(
+            tr("Release to connect to %1")
+                .arg(_graphModel->nodeData(nodeGraphicsObject->nodeId(), QtNodes::NodeRole::Caption).toString()));
+        return;
+    }
+
+    _connectionFeedbackActive = true;
+    Q_EMIT dropPreviewMessageChanged(tr("This port cannot accept the connection."));
+}
+
+void QtNodesEditorWidget::clearConnectionFeedback()
+{
+    if (!_connectionFeedbackActive)
+        return;
+
+    _connectionFeedbackActive = false;
+    Q_EMIT dropPreviewMessageChanged(tr("Ready"));
+}
+
 void QtNodesEditorWidget::retranslateBuiltInContent()
 {
     _builtInNodeRegistry.retranslate();
@@ -767,8 +1324,10 @@ void QtNodesEditorWidget::retranslateBuiltInContent()
 
     if (_selectedNodeId != QtNodes::InvalidNodeId) {
         auto state = selectedState();
-        if (state)
+        if (state) {
             Q_EMIT selectedNodeChanged(state->typeKey, state->displayName, state->description, state->properties);
+            emitSelectedNodeValidation();
+        }
     }
 }
 
@@ -801,6 +1360,17 @@ void QtNodesEditorWidget::handleNodeSelected(QtNodes::NodeId nodeId)
                                nodeStateIt->displayName,
                                nodeStateIt->description,
                                nodeStateIt->properties);
+    emitSelectedNodeValidation();
+}
+
+void QtNodesEditorWidget::emitSelectedNodeValidation()
+{
+    if (_selectedNodeId == QtNodes::InvalidNodeId) {
+        Q_EMIT selectedNodeValidationChanged(QString(), QString());
+        return;
+    }
+
+    Q_EMIT selectedNodeValidationChanged(nodeValidationState(_selectedNodeId), nodeValidationMessage(_selectedNodeId));
 }
 
 bool QtNodesEditorWidget::acceptNodeDrag(QMimeData const *mimeData,
@@ -837,6 +1407,18 @@ std::optional<QtNodesEditorWidget::NodeState> QtNodesEditorWidget::selectedState
     return *nodeStateIt;
 }
 
+QtNodes::ConnectionGraphicsObject *QtNodesEditorWidget::draftConnectionGraphicsObject() const
+{
+    const auto items = _scene->items();
+    for (auto *item : items) {
+        auto *connectionObject = dynamic_cast<QtNodes::ConnectionGraphicsObject *>(item);
+        if (connectionObject != nullptr && connectionObject->connectionState().requiresPort())
+            return connectionObject;
+    }
+
+    return nullptr;
+}
+
 void QtNodesEditorWidget::showCanvasContextMenu(QPoint const &globalPos)
 {
     QMenu menu;
@@ -865,12 +1447,7 @@ void QtNodesEditorWidget::showCanvasContextMenu(QPoint const &globalPos)
         menu.addSeparator();
 
     QAction *selectAllAction = menu.addAction(tr("Select All"));
-    connect(selectAllAction, &QAction::triggered, this, [this]() {
-        for (auto const nodeId : sortedNodeIds()) {
-            if (auto *obj = _scene->nodeGraphicsObject(nodeId); obj != nullptr)
-                obj->setSelected(true);
-        }
-    });
+    connect(selectAllAction, &QAction::triggered, this, &QtNodesEditorWidget::selectAllNodes);
 
     menu.exec(globalPos);
 }

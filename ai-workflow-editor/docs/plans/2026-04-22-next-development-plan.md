@@ -10,6 +10,26 @@
 
 ---
 
+## Direction Guardrails
+
+This project must stay on this product path:
+
+`AI Workflow Editor is a desktop visual editor for designing, validating, and managing AI workflows composed of prompts, LLMs, tools, conditions, memory, retrieval, and outputs.`
+
+Do not drift into these directions:
+
+- implementing or training foundation models
+- turning the app into a generic business-process editor
+- reducing the product into a chat window wrapper
+- prematurely building a plugin marketplace or cloud platform
+- adding features that do not strengthen AI workflow authoring
+
+When deciding whether to add a feature, use this filter:
+
+`Does it materially improve AI workflow authoring, inspection, validation, debugging, or management?`
+
+If not, defer it.
+
 ## Current Baseline
 
 Already working:
@@ -232,4 +252,3 @@ Pause and reassess before further feature growth if any of these happen:
 - inspector property handling becomes repetitive enough to justify a field-schema layer
 
 If that happens, introduce a focused `WorkflowDocument` abstraction before adding more features.
-

@@ -19,6 +19,7 @@ public:
     explicit InspectorPanel(QWidget *parent = nullptr);
 
     void clearSelection();
+    void setValidationFeedback(QString const &state, QString const &message);
     void setSelectedNode(QString const &typeKey,
                          QString const &displayName,
                          QString const &description,
@@ -34,16 +35,19 @@ Q_SIGNALS:
 
 private:
     void retranslateUi();
+    void updateValidationLabel();
     void setTypeSpecificSectionVisible(QString const &typeKey);
     QString typeDisplayName(QString const &typeKey) const;
     QString typeSummary(QString const &typeKey) const;
     QString sectionTitle(QString const &typeKey) const;
 
     QString _currentTypeKey;
+    QString _validationState;
     QLabel *_hintLabel;
     QLabel *_typeBadgeLabel;
     QLabel *_typeSummaryLabel;
     QLabel *_sectionTitleLabel;
+    QLabel *_validationLabel;
     QLabel *_emptyStateLabel;
     QLabel *_displayNameLabel;
     QLabel *_descriptionLabel;

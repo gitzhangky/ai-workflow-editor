@@ -85,6 +85,8 @@
     <message><source>Save As...</source><translation>另存为...</translation></message>
     <message><source>Recent Files</source><translation>最近文件</translation></message>
     <message><source>Delete</source><translation>删除</translation></message>
+    <message><source>Select All</source><translation>全选</translation></message>
+    <message><source>%1: Passed validation</source><translation>%1：已通过检查</translation></message>
     <message><source>Unsaved Changes</source><translation>未保存的更改</translation></message>
     <message><source>The current workflow has unsaved changes.
 Do you want to save before continuing?</source><translation>当前工作流有未保存的更改。
@@ -94,6 +96,13 @@ Do you want to save before continuing?</source><translation>当前工作流有�
     <name>QtNodesEditorWidget</name>
     <message><source>Release to create %1</source><translation>松开以创建 %1</translation></message>
     <message><source>Ready</source><translation>就绪</translation></message>
+    <message><source>Prompt template is empty.</source><translation>提示词模板为空。</translation></message>
+    <message><source>Model name is required.</source><translation>模型名称不能为空。</translation></message>
+    <message><source>Tool name is required.</source><translation>工具名称不能为空。</translation></message>
+    <message><source>Input mapping must be a valid JSON object.</source><translation>输入映射必须是合法的 JSON 对象。</translation></message>
+    <message><source>Drag to a compatible port.</source><translation>拖到兼容的端口上进行连接。</translation></message>
+    <message><source>Release to connect to %1</source><translation>松开以连接到 %1</translation></message>
+    <message><source>This port cannot accept the connection.</source><translation>此端口不能接受当前连接。</translation></message>
     <message><source>Delete Node</source><translation>删除节点</translation></message>
     <message><source>Delete Connection</source><translation>删除连接</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>

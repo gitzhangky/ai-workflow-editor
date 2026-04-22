@@ -5,6 +5,7 @@
 #include <QtNodes/ConnectionIdUtils>
 #include <QtNodes/Definitions>
 #include <QtNodes/NodeStyle>
+#include <QtNodes/internal/NodeDelegateModel.hpp>
 #include <QtNodes/internal/ConnectionGraphicsObject.hpp>
 #include <QtNodes/internal/NodeGraphicsObject.hpp>
 
@@ -60,6 +61,11 @@ QRectF cardRectFor(QtNodes::AbstractNodeGeometry const &geometry, QtNodes::NodeI
 {
     return QRectF(QPointF(0.0, 0.0), geometry.size(nodeId));
 }
+
+QtNodes::NodeValidationState validationStateFor(QtNodes::AbstractGraphModel const &model, QtNodes::NodeId nodeId)
+{
+    return model.nodeData(nodeId, QtNodes::NodeRole::ValidationState).value<QtNodes::NodeValidationState>();
+}
 }
 
 void StyledNodePainter::paint(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const
@@ -70,6 +76,7 @@ void StyledNodePainter::paint(QPainter *painter, QtNodes::NodeGraphicsObject &ng
     drawHeader(painter, ngo);
     drawTitle(painter, ngo);
     drawContentHints(painter, ngo);
+    drawValidationBadge(painter, ngo);
     drawPorts(painter, ngo);
 }
 
@@ -80,6 +87,11 @@ void StyledNodePainter::drawCard(QPainter *painter, QtNodes::NodeGraphicsObject 
     auto const &geometry = ngo.nodeScene()->nodeGeometry();
     auto const rect = cardRectFor(geometry, nodeId);
     auto const nodeStyle = styleFor(model, nodeId);
+    auto const validationState = validationStateFor(model, nodeId);
+    const bool hasValidationIssue = validationState._state != QtNodes::NodeValidationState::State::Valid;
+    const QColor validationAccent = validationState._state == QtNodes::NodeValidationState::State::Error
+                                        ? nodeStyle.ErrorColor
+                                        : nodeStyle.WarningColor;
 
     QPainterPath shadowPath;
     shadowPath.addRoundedRect(rect.translated(0.0, 4.0), CardCornerRadius, CardCornerRadius);
@@ -98,8 +110,18 @@ void StyledNodePainter::drawCard(QPainter *painter, QtNodes::NodeGraphicsObject 
     gradient.setColorAt(1.0, nodeStyle.GradientColor3);
     painter->fillPath(cardPath, gradient);
 
-    QPen borderPen(ngo.isSelected() ? nodeStyle.SelectedBoundaryColor : nodeStyle.NormalBoundaryColor,
-                   ngo.isSelected() ? 2.3 : 1.4);
+    if (hasValidationIssue) {
+        QColor indicator = validationAccent;
+        indicator.setAlpha(validationState._state == QtNodes::NodeValidationState::State::Error ? 165 : 135);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(indicator);
+        painter->drawRoundedRect(QRectF(rect.left() + 14.0, rect.bottom() - 10.0, rect.width() - 28.0, 3.0), 1.5, 1.5);
+    }
+
+    const QColor borderColor = hasValidationIssue && !ngo.isSelected()
+                                   ? validationAccent
+                                   : (ngo.isSelected() ? nodeStyle.SelectedBoundaryColor : nodeStyle.NormalBoundaryColor);
+    QPen borderPen(borderColor, ngo.isSelected() ? 2.3 : (hasValidationIssue ? 1.7 : 1.4));
     painter->setPen(borderPen);
     painter->drawPath(cardPath);
 }
@@ -264,4 +286,35 @@ void StyledNodePainter::drawPorts(QPainter *painter, QtNodes::NodeGraphicsObject
 
     if (ngo.nodeState().connectionForReaction())
         ngo.nodeState().resetConnectionForReaction();
+}
+
+void StyledNodePainter::drawValidationBadge(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const
+{
+    auto const &model = ngo.graphModel();
+    auto const nodeId = ngo.nodeId();
+    const auto validationState = validationStateFor(model, nodeId);
+    if (validationState._state == QtNodes::NodeValidationState::State::Valid)
+        return;
+
+    const QColor accent = validationState._state == QtNodes::NodeValidationState::State::Error
+                              ? QColor(QStringLiteral("#C15757"))
+                              : QColor(QStringLiteral("#D48C2F"));
+
+    auto const &geometry = ngo.nodeScene()->nodeGeometry();
+    auto const rect = cardRectFor(geometry, nodeId);
+
+    QRectF badgeRect(rect.right() - 28.0, rect.top() + 8.0, 16.0, 16.0);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(accent);
+    painter->drawEllipse(badgeRect);
+
+    QFont badgeFont = painter->font();
+    badgeFont.setPointSizeF(10.0);
+    badgeFont.setBold(true);
+    painter->setFont(badgeFont);
+    painter->setPen(QColor(QStringLiteral("#FFFDF9")));
+    painter->drawText(badgeRect,
+                      Qt::AlignCenter,
+                      validationState._state == QtNodes::NodeValidationState::State::Error ? QStringLiteral("x")
+                                                                                            : QStringLiteral("!"));
 }

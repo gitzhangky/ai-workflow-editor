@@ -5,7 +5,10 @@
 
 #include <QtNodes/ConnectionStyle>
 #include <QtNodes/GraphicsViewStyle>
+#include <QtNodes/internal/ConnectionGraphicsObject.hpp>
+#include <QtNodes/internal/DataFlowGraphicsScene.hpp>
 
+#include <QAction>
 #include <QDockWidget>
 #include <QDir>
 #include <QFile>
@@ -28,6 +31,24 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QtTest/QTest>
+#include <QMouseEvent>
+
+namespace
+{
+QtNodes::ConnectionGraphicsObject *selectConnectionGraphicsObject(QtNodesEditorWidget *editor,
+                                                                  QtNodes::ConnectionId const &connectionId)
+{
+    auto *graphicsView = editor != nullptr ? editor->findChild<QGraphicsView *>() : nullptr;
+    auto *scene =
+        graphicsView != nullptr ? qobject_cast<QtNodes::DataFlowGraphicsScene *>(graphicsView->scene()) : nullptr;
+    if (scene != nullptr)
+        scene->clearSelection();
+    auto *connectionGraphicsObject = scene != nullptr ? scene->connectionGraphicsObject(connectionId) : nullptr;
+    if (connectionGraphicsObject != nullptr)
+        connectionGraphicsObject->setSelected(true);
+    return connectionGraphicsObject;
+}
+}
 
 class MainWindowTests : public QObject
 {
@@ -58,6 +79,12 @@ private slots:
     void showsTypeSpecificInspectorFieldsForPromptLlmAndTool();
     void showsTypeSpecificInspectorHeaderAndEmptyState();
     void appliesDistinctNodeCardStylesByType();
+    void marksIncompletePromptNodeWithWarningValidationState();
+    void marksInvalidToolNodeWithErrorValidationState();
+    void showsValidationMessageInInspectorForSelectedNode();
+    void showsImmediateStatusFeedbackForInvalidConnectionDrag();
+    void showsValidationSummaryForCurrentSelectionInStatusBar();
+    void assignsExpectedKeyboardShortcuts();
     void enforcesConnectionRulesBetweenCompatiblePorts();
     void savesAndLoadsWorkflowJson();
     void tracksDirtyStateOnEdits();
@@ -71,6 +98,11 @@ private slots:
     void deletesSelectedConnectionFromCanvas();
     void deleteMarksDocumentDirty();
     void editMenuContainsDeleteAction();
+    void undoesAndRedoesNodeCreation();
+    void undoesAndRedoesPropertyEdit();
+    void undoesAndRedoesNodeDeletion();
+    void undoesAndRedoesConnectionDeletion();
+    void restoresDirtyStateWhenUndoAndRedoCrossSavedConnectionDeletion();
 };
 
 void MainWindowTests::initTestCase()
@@ -623,6 +655,181 @@ void MainWindowTests::appliesDistinctNodeCardStylesByType()
     QVERIFY(llmStyle != toolStyle);
 }
 
+void MainWindowTests::marksIncompletePromptNodeWithWarningValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    QCOMPARE(editor->nodeValidationState(promptNode), QString("warning"));
+
+    editor->selectNode(promptNode);
+    auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
+    QVERIFY(promptUserEdit != nullptr);
+    promptUserEdit->setPlainText("Summarize {{input}}");
+
+    QCOMPARE(editor->nodeValidationState(promptNode), QString("valid"));
+}
+
+void MainWindowTests::marksInvalidToolNodeWithErrorValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto toolNode = editor->createNode("tool");
+    editor->selectNode(toolNode);
+
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+    auto *toolInputMappingEdit = window.findChild<QTextEdit *>("inspectorToolInputMappingEdit");
+    QVERIFY(toolNameEdit != nullptr);
+    QVERIFY(toolInputMappingEdit != nullptr);
+
+    toolNameEdit->setText("web_search");
+    toolInputMappingEdit->setPlainText("{bad json}");
+
+    QCOMPARE(editor->nodeValidationState(toolNode), QString("error"));
+}
+
+void MainWindowTests::showsValidationMessageInInspectorForSelectedNode()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(promptUserEdit != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    editor->selectNode(promptNode);
+
+    QVERIFY(!validationLabel->isHidden());
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("提示词模板为空。"));
+
+    promptUserEdit->setPlainText("Summarize {{input}}");
+
+    QVERIFY(validationLabel->isHidden());
+    QVERIFY(validationLabel->text().isEmpty());
+}
+
+void MainWindowTests::showsImmediateStatusFeedbackForInvalidConnectionDrag()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *graphicsView = editor->findChild<QGraphicsView *>();
+    QVERIFY(editor != nullptr);
+    QVERIFY(graphicsView != nullptr);
+
+    const auto promptNode = editor->createNode("prompt", QPointF(320.0, 120.0));
+    const auto startNode = editor->createNode("start", QPointF(80.0, 120.0));
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+
+    const QPoint sourcePoint = graphicsView->mapFromScene(editor->portScenePosition(promptNode, QtNodes::PortType::Out, 0));
+    const QPoint targetPoint = graphicsView->mapFromScene(editor->portScenePosition(startNode, QtNodes::PortType::Out, 0));
+
+    QMouseEvent pressEvent(QEvent::MouseButtonPress,
+                           sourcePoint,
+                           graphicsView->viewport()->mapToGlobal(sourcePoint),
+                           Qt::LeftButton,
+                           Qt::LeftButton,
+                           Qt::NoModifier);
+    QVERIFY(QCoreApplication::sendEvent(graphicsView->viewport(), &pressEvent));
+
+    QMouseEvent moveEvent(QEvent::MouseMove,
+                          targetPoint,
+                          graphicsView->viewport()->mapToGlobal(targetPoint),
+                          Qt::NoButton,
+                          Qt::LeftButton,
+                          Qt::NoModifier);
+    QVERIFY(QCoreApplication::sendEvent(graphicsView->viewport(), &moveEvent));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(window.statusBar()->currentMessage(), QString::fromUtf8("此端口不能接受当前连接。"));
+
+    QMouseEvent releaseEvent(QEvent::MouseButtonRelease,
+                             targetPoint,
+                             graphicsView->viewport()->mapToGlobal(targetPoint),
+                             Qt::LeftButton,
+                             Qt::NoButton,
+                             Qt::NoModifier);
+    QVERIFY(QCoreApplication::sendEvent(graphicsView->viewport(), &releaseEvent));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(window.statusBar()->currentMessage(), QString::fromUtf8("就绪"));
+}
+
+void MainWindowTests::showsValidationSummaryForCurrentSelectionInStatusBar()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(promptUserEdit != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    editor->selectNode(promptNode);
+
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("提示词")));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("提示词模板为空")));
+
+    promptUserEdit->setPlainText("Summarize {{input}}");
+
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("已通过检查")));
+}
+
+void MainWindowTests::assignsExpectedKeyboardShortcuts()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *newAction = window.findChild<QAction *>("newAction");
+    auto *openAction = window.findChild<QAction *>("openAction");
+    auto *saveAction = window.findChild<QAction *>("saveAction");
+    auto *saveAsAction = window.findChild<QAction *>("saveAsAction");
+    auto *deleteAction = window.findChild<QAction *>("deleteAction");
+    auto *undoAction = window.findChild<QAction *>("undoAction");
+    auto *redoAction = window.findChild<QAction *>("redoAction");
+    auto *centerAction = window.findChild<QAction *>("centerAction");
+    auto *selectAllAction = window.findChild<QAction *>("selectAllAction");
+
+    QVERIFY(newAction != nullptr);
+    QVERIFY(openAction != nullptr);
+    QVERIFY(saveAction != nullptr);
+    QVERIFY(saveAsAction != nullptr);
+    QVERIFY(deleteAction != nullptr);
+    QVERIFY(undoAction != nullptr);
+    QVERIFY(redoAction != nullptr);
+    QVERIFY(centerAction != nullptr);
+    QVERIFY(selectAllAction != nullptr);
+
+    QCOMPARE(newAction->shortcut(), QKeySequence::keyBindings(QKeySequence::New).constFirst());
+    QCOMPARE(openAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Open).constFirst());
+    QCOMPARE(saveAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Save).constFirst());
+    QCOMPARE(saveAsAction->shortcut(), QKeySequence::keyBindings(QKeySequence::SaveAs).constFirst());
+    QCOMPARE(deleteAction->shortcut(), QKeySequence(Qt::Key_Delete));
+    QCOMPARE(undoAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Undo).constFirst());
+    QCOMPARE(redoAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Redo).constFirst());
+    QCOMPARE(centerAction->shortcut(), QKeySequence(Qt::Key_Space));
+    QCOMPARE(selectAllAction->shortcut(), QKeySequence::keyBindings(QKeySequence::SelectAll).constFirst());
+}
+
 void MainWindowTests::enforcesConnectionRulesBetweenCompatiblePorts()
 {
     LanguageManager languageManager;
@@ -865,7 +1072,11 @@ void MainWindowTests::deletesSelectedConnectionFromCanvas()
     QVERIFY(editor->connectNodes(startNode, 0, promptNode, 0));
     QCOMPARE(editor->connectionCount(), 1);
 
+    const QtNodes::ConnectionId connectionId{startNode, 0, promptNode, 0};
+    QVERIFY(selectConnectionGraphicsObject(editor, connectionId) != nullptr);
+
     editor->deleteSelectedConnections();
+    QCOMPARE(editor->connectionCount(), 0);
     QCOMPARE(editor->nodeCount(), 2);
 }
 
@@ -903,6 +1114,158 @@ void MainWindowTests::editMenuContainsDeleteAction()
             hasDelete = true;
     }
     QVERIFY(hasDelete);
+}
+
+void MainWindowTests::undoesAndRedoesNodeCreation()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *undoAction = window.findChild<QAction *>("undoAction");
+    auto *redoAction = window.findChild<QAction *>("redoAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(undoAction != nullptr);
+    QVERIFY(redoAction != nullptr);
+
+    QCOMPARE(editor->nodeCount(), 0);
+    window.addNodeFromType("prompt");
+    QCOMPARE(editor->nodeCount(), 1);
+
+    undoAction->trigger();
+    QCOMPARE(editor->nodeCount(), 0);
+
+    redoAction->trigger();
+    QCOMPARE(editor->nodeCount(), 1);
+}
+
+void MainWindowTests::undoesAndRedoesPropertyEdit()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *undoAction = window.findChild<QAction *>("undoAction");
+    auto *redoAction = window.findChild<QAction *>("redoAction");
+    auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(undoAction != nullptr);
+    QVERIFY(redoAction != nullptr);
+    QVERIFY(promptUserEdit != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    editor->selectNode(promptNode);
+    promptUserEdit->setPlainText("Summarize {{input}}");
+    QCOMPARE(editor->selectedNodeProperty("userPromptTemplate").toString(), QString("Summarize {{input}}"));
+
+    undoAction->trigger();
+    QCOMPARE(editor->selectedNodeProperty("userPromptTemplate").toString(), QString());
+
+    redoAction->trigger();
+    QCOMPARE(editor->selectedNodeProperty("userPromptTemplate").toString(), QString("Summarize {{input}}"));
+}
+
+void MainWindowTests::undoesAndRedoesNodeDeletion()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *undoAction = window.findChild<QAction *>("undoAction");
+    auto *redoAction = window.findChild<QAction *>("redoAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(undoAction != nullptr);
+    QVERIFY(redoAction != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QCOMPARE(editor->nodeCount(), 1);
+
+    editor->selectNode(promptNode);
+    editor->deleteSelectedNodes();
+    QCOMPARE(editor->nodeCount(), 0);
+
+    undoAction->trigger();
+    QCOMPARE(editor->nodeCount(), 1);
+    QCOMPARE(editor->workflowDisplayNames(), QStringList({QString::fromUtf8("提示词")}));
+
+    redoAction->trigger();
+    QCOMPARE(editor->nodeCount(), 0);
+}
+
+void MainWindowTests::undoesAndRedoesConnectionDeletion()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *deleteAction = window.findChild<QAction *>("deleteAction");
+    auto *undoAction = window.findChild<QAction *>("undoAction");
+    auto *redoAction = window.findChild<QAction *>("redoAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(deleteAction != nullptr);
+    QVERIFY(undoAction != nullptr);
+    QVERIFY(redoAction != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto promptNode = editor->createNode("prompt");
+    const QtNodes::ConnectionId connectionId{startNode, 0, promptNode, 0};
+    QVERIFY(editor->connectNodes(startNode, 0, promptNode, 0));
+    QCOMPARE(editor->connectionCount(), 1);
+
+    QVERIFY(selectConnectionGraphicsObject(editor, connectionId) != nullptr);
+    deleteAction->trigger();
+    QCOMPARE(editor->connectionCount(), 0);
+    QCOMPARE(editor->nodeCount(), 2);
+
+    undoAction->trigger();
+    QCOMPARE(editor->connectionCount(), 1);
+    QVERIFY(selectConnectionGraphicsObject(editor, connectionId) != nullptr);
+
+    redoAction->trigger();
+    QCOMPARE(editor->connectionCount(), 0);
+    QCOMPARE(editor->nodeCount(), 2);
+}
+
+void MainWindowTests::restoresDirtyStateWhenUndoAndRedoCrossSavedConnectionDeletion()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *deleteAction = window.findChild<QAction *>("deleteAction");
+    auto *undoAction = window.findChild<QAction *>("undoAction");
+    auto *redoAction = window.findChild<QAction *>("redoAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(deleteAction != nullptr);
+    QVERIFY(undoAction != nullptr);
+    QVERIFY(redoAction != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto promptNode = editor->createNode("prompt");
+    const QtNodes::ConnectionId connectionId{startNode, 0, promptNode, 0};
+    QVERIFY(editor->connectNodes(startNode, 0, promptNode, 0));
+    QVERIFY(window.saveWorkflowToPath(QDir(tempDir.path()).filePath("connection-delete.json")));
+    QVERIFY(!window.isDirty());
+    QVERIFY(!window.windowTitle().startsWith("*"));
+
+    QVERIFY(selectConnectionGraphicsObject(editor, connectionId) != nullptr);
+    deleteAction->trigger();
+    QVERIFY(window.isDirty());
+    QVERIFY(window.windowTitle().startsWith("*"));
+
+    undoAction->trigger();
+    QVERIFY(!window.isDirty());
+    QVERIFY(!window.windowTitle().startsWith("*"));
+    QCOMPARE(editor->connectionCount(), 1);
+
+    redoAction->trigger();
+    QVERIFY(window.isDirty());
+    QVERIFY(window.windowTitle().startsWith("*"));
+    QCOMPARE(editor->connectionCount(), 0);
 }
 
 QTEST_MAIN(MainWindowTests)

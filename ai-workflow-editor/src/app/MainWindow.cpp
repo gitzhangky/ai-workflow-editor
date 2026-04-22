@@ -15,6 +15,7 @@
 #include <QFileInfo>
 #include <QFont>
 #include <QIcon>
+#include <QLabel>
 #include <QLineEdit>
 #include <QListWidgetItem>
 #include <QMenu>
@@ -62,11 +63,13 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _nodeLibrarySearchEdit(nullptr)
     , _inspectorPanel(nullptr)
     , _editorWidget(nullptr)
+    , _selectionValidationSummaryLabel(nullptr)
     , _newAction(nullptr)
     , _openAction(nullptr)
     , _saveAction(nullptr)
     , _saveAsAction(nullptr)
     , _deleteAction(nullptr)
+    , _selectAllAction(nullptr)
     , _undoAction(nullptr)
     , _redoAction(nullptr)
     , _centerAction(nullptr)
@@ -77,6 +80,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _languageEnglishAction(nullptr)
     , _languageToolButton(nullptr)
     , _currentWorkflowPath()
+    , _currentSelectedNodeDisplayName()
     , _dirty(false)
 {
     setObjectName("appMainWindow");
@@ -108,6 +112,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _saveAsAction->setObjectName("saveAsAction");
     _deleteAction = new QAction(this);
     _deleteAction->setObjectName("deleteAction");
+    _selectAllAction = new QAction(this);
+    _selectAllAction->setObjectName("selectAllAction");
     _undoAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("undo")), QString());
     _undoAction->setObjectName("undoAction");
     _redoAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("redo")), QString());
@@ -165,6 +171,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _editorWidget = new QtNodesEditorWidget(this);
     setCentralWidget(_editorWidget);
     statusBar()->setObjectName("primaryStatusBar");
+    _selectionValidationSummaryLabel = new QLabel(statusBar());
+    _selectionValidationSummaryLabel->setObjectName("selectionValidationSummaryLabel");
+    statusBar()->addPermanentWidget(_selectionValidationSummaryLabel, 1);
 
     connect(_nodeLibraryList, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item) {
         addNodeFromType(item->data(NodeLibraryListWidget::NodeTypeRole).toString());
@@ -184,9 +193,29 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             [this](QString const &message) { statusBar()->showMessage(message); });
     connect(_editorWidget,
             &QtNodesEditorWidget::selectedNodeChanged,
-            _inspectorPanel,
-            &InspectorPanel::setSelectedNode);
-    connect(_editorWidget, &QtNodesEditorWidget::selectionCleared, _inspectorPanel, &InspectorPanel::clearSelection);
+            this,
+            [this](QString const &typeKey,
+                   QString const &displayName,
+                   QString const &description,
+                   QVariantMap const &properties) {
+                Q_UNUSED(typeKey);
+                Q_UNUSED(description);
+                Q_UNUSED(properties);
+                _currentSelectedNodeDisplayName = displayName;
+                _inspectorPanel->setSelectedNode(typeKey, displayName, description, properties);
+            });
+    connect(_editorWidget,
+            &QtNodesEditorWidget::selectedNodeValidationChanged,
+            this,
+            [this](QString const &state, QString const &message) {
+                _inspectorPanel->setValidationFeedback(state, message);
+                updateSelectionValidationSummary(state, message);
+            });
+    connect(_editorWidget, &QtNodesEditorWidget::selectionCleared, this, [this]() {
+        _currentSelectedNodeDisplayName.clear();
+        _inspectorPanel->clearSelection();
+        updateSelectionValidationSummary(QString(), QString());
+    });
     connect(_inspectorPanel,
             &InspectorPanel::displayNameEdited,
             _editorWidget,
@@ -201,6 +230,12 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             &QtNodesEditorWidget::setSelectedNodeProperty);
 
     connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::markDirty);
+    connect(_editorWidget, &QtNodesEditorWidget::cleanStateChanged, this, [this](bool clean) {
+        if (clean)
+            clearDirty();
+        else
+            markDirty();
+    });
 
     _recentFilesMenu = new QMenu(this);
     _recentFilesMenu->setObjectName("recentFilesMenu");
@@ -209,6 +244,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
         if (!maybeSave())
             return;
         _editorWidget->clearWorkflow();
+        _editorWidget->markCurrentStateClean();
         _currentWorkflowPath.clear();
         clearDirty();
         statusBar()->showMessage(tr("New workflow"));
@@ -248,6 +284,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     });
 
     connect(_deleteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::deleteSelection);
+    connect(_selectAllAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::selectAllNodes);
+    connect(_undoAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::undo);
+    connect(_redoAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::redo);
+    connect(_centerAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::centerSelection);
 
     connect(_languageChineseAction, &QAction::triggered, this, [this]() {
         if (_languageManager != nullptr)
@@ -281,6 +321,12 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     updateLanguageActions();
 }
 
+MainWindow::~MainWindow()
+{
+    if (_editorWidget != nullptr)
+        disconnect(_editorWidget, nullptr, this, nullptr);
+}
+
 void MainWindow::changeEvent(QEvent *event)
 {
     if (event->type() == QEvent::LanguageChange)
@@ -299,6 +345,7 @@ bool MainWindow::saveWorkflowToPath(QString const &filePath)
     const bool saved = _editorWidget->saveWorkflow(filePath);
     if (saved) {
         _currentWorkflowPath = filePath;
+        _editorWidget->markCurrentStateClean();
         clearDirty();
         addToRecentFiles(filePath);
         statusBar()->showMessage(tr("Saved %1").arg(filePath));
@@ -312,6 +359,7 @@ bool MainWindow::loadWorkflowFromPath(QString const &filePath)
     const bool loaded = _editorWidget->loadWorkflow(filePath);
     if (loaded) {
         _currentWorkflowPath = filePath;
+        _editorWidget->markCurrentStateClean();
         clearDirty();
         addToRecentFiles(filePath);
         statusBar()->showMessage(tr("Loaded %1").arg(filePath));
@@ -377,10 +425,19 @@ void MainWindow::retranslateUi()
     _saveAsAction->setText(tr("Save As..."));
     _recentFilesMenu->setTitle(tr("Recent Files"));
     _deleteAction->setText(tr("Delete"));
-    _deleteAction->setShortcut(QKeySequence::Delete);
+    _selectAllAction->setText(tr("Select All"));
+    _newAction->setShortcut(QKeySequence::keyBindings(QKeySequence::New).constFirst());
+    _openAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Open).constFirst());
+    _saveAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Save).constFirst());
+    _saveAsAction->setShortcut(QKeySequence::keyBindings(QKeySequence::SaveAs).constFirst());
+    _deleteAction->setShortcut(QKeySequence(Qt::Key_Delete));
+    _selectAllAction->setShortcut(QKeySequence::keyBindings(QKeySequence::SelectAll).constFirst());
     _undoAction->setText(tr("Undo"));
     _redoAction->setText(tr("Redo"));
     _centerAction->setText(tr("Center"));
+    _undoAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Undo).constFirst());
+    _redoAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Redo).constFirst());
+    _centerAction->setShortcut(QKeySequence(Qt::Key_Space));
     _toggleNodeLibraryAction->setText(tr("Show Node Library"));
     _toggleInspectorAction->setText(tr("Show Inspector"));
     _languageToolButton->setToolTip(tr("Language"));
@@ -409,6 +466,7 @@ void MainWindow::retranslateUi()
     _editMenu->addAction(_undoAction);
     _editMenu->addAction(_redoAction);
     _editMenu->addSeparator();
+    _editMenu->addAction(_selectAllAction);
     _editMenu->addAction(_deleteAction);
 
     _viewMenu->clear();
@@ -428,6 +486,7 @@ void MainWindow::retranslateUi()
     rebuildRecentFilesMenu();
     populateNodeLibrary();
     updateLanguageActions();
+    updateSelectionValidationSummary(QString(), QString());
 }
 
 void MainWindow::updateLanguageActions()
@@ -479,6 +538,26 @@ void MainWindow::updateWindowTitle()
     if (_dirty)
         title = QStringLiteral("* ") + title;
     setWindowTitle(title);
+}
+
+void MainWindow::updateSelectionValidationSummary(QString const &state, QString const &message)
+{
+    if (_selectionValidationSummaryLabel == nullptr)
+        return;
+
+    if (_currentSelectedNodeDisplayName.isEmpty()) {
+        _selectionValidationSummaryLabel->clear();
+        return;
+    }
+
+    if (state == QStringLiteral("warning") || state == QStringLiteral("error")) {
+        _selectionValidationSummaryLabel->setText(
+            tr("%1: %2").arg(_currentSelectedNodeDisplayName, message));
+        return;
+    }
+
+    _selectionValidationSummaryLabel->setText(
+        tr("%1: Passed validation").arg(_currentSelectedNodeDisplayName));
 }
 
 bool MainWindow::maybeSave()

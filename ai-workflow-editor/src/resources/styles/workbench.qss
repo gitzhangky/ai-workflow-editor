@@ -146,6 +146,24 @@ QLabel#inspectorSectionTitleLabel {
     margin-top: 6px;
 }
 
+QLabel#inspectorValidationLabel {
+    border-radius: 10px;
+    font-weight: 600;
+    padding: 9px 12px;
+}
+
+QLabel#inspectorValidationLabel[severity="warning"] {
+    background: #fcf4e7;
+    border: 1px solid #e4c79a;
+    color: #8a6427;
+}
+
+QLabel#inspectorValidationLabel[severity="error"] {
+    background: #f9eceb;
+    border: 1px solid #debbb7;
+    color: #984b44;
+}
+
 QLabel#inspectorEmptyStateLabel {
     background: #f4eee4;
     border: 1px dashed #d8cdbb;
@@ -208,4 +226,10 @@ QStatusBar#primaryStatusBar {
 
 QStatusBar::item {
     border: none;
+}
+
+QLabel#selectionValidationSummaryLabel {
+    color: #6a5f54;
+    font-weight: 500;
+    padding-right: 6px;
 }

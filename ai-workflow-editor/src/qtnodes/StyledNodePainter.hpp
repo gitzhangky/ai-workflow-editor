@@ -16,4 +16,5 @@ private:
     void drawTitle(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const;
     void drawPorts(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const;
     void drawContentHints(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const;
+    void drawValidationBadge(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const;
 };

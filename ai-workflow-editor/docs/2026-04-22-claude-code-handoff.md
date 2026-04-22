@@ -7,6 +7,27 @@ It summarizes the current product state, code layout, build commands, compatibil
 
 The goal is to let a new coding agent pick up the project without reconstructing the whole conversation history.
 
+## Product Direction Lock
+
+This project direction must not drift.
+
+`AI Workflow Editor` is a desktop visual orchestration editor for AI workflows.
+It is used to connect and configure prompts, LLMs, tools, conditions, memory, retrieval, and outputs into executable workflow structures.
+
+It is **not**:
+
+- a large model implementation project
+- a generic low-code/BPM platform
+- a chat client shell
+- a plugin marketplace project
+- a general-purpose business workflow engine
+
+All future features should be evaluated against this question:
+
+`Does this improve the user's ability to design, inspect, validate, debug, and manage AI workflows?`
+
+If the answer is not clearly yes, the feature is likely out of scope or should be postponed.
+
 ## Project Boundaries
 
 - Product app: `ai-workflow-editor/`
@@ -77,6 +98,7 @@ Not implemented yet:
 - Default UI language is Chinese.
 - More languages may be added later.
 - The editor currently focuses on composition and persistence, not execution.
+- The long-term role of the product is to orchestrate external AI capabilities, not to implement the models themselves.
 - `QVariantMap` is intentionally used for node property storage at this stage because node types are still evolving.
 
 ## Code Map
@@ -292,4 +314,3 @@ Expected current result:
 
 - `4/4` test suites passing
 - App test suite includes 30 test functions (23 original + 7 Phase 1 additions)
-
