@@ -1,6 +1,7 @@
 #include "app/MainWindow.hpp"
 #include "app/LanguageManager.hpp"
 #include "app/NodeLibraryListWidget.hpp"
+#include "inspector/InspectorFieldSchema.hpp"
 #include "qtnodes/QtNodesEditorWidget.hpp"
 
 #include <QtNodes/ConnectionStyle>
@@ -21,6 +22,7 @@
 #include <QMimeData>
 #include <QDoubleSpinBox>
 #include <QSettings>
+#include <QSet>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -107,6 +109,9 @@ private slots:
     void showsTypeSpecificInspectorFieldsForPromptLlmAndTool();
     void exposesStableInspectorFieldMetadata();
     void exposesStableInspectorFieldHintMetadata();
+    void exposesStableInspectorFieldSchemaObjectNames();
+    void exposesStableInspectorSectionSchemaObjectNames();
+    void exposesStableInspectorSectionSchemaCopy();
     void retranslatesInspectorFieldLabelsAtRuntime();
     void retranslatesInspectorFieldHintsAtRuntime();
     void showsTypeSpecificInspectorHeaderAndEmptyState();
@@ -734,6 +739,80 @@ void MainWindowTests::exposesStableInspectorFieldHintMetadata()
              QString("Example: {\"query\": \"{{input}}\"}"));
     QCOMPARE(toolInputMappingEdit->property("inspectorHelpTextSource").toString(),
              QString("Optional. Provide a JSON object that maps workflow values into tool inputs."));
+}
+
+void MainWindowTests::exposesStableInspectorFieldSchemaObjectNames()
+{
+    const auto schemas = builtInInspectorFieldSchemas();
+    QVERIFY(!schemas.empty());
+
+    QSet<QString> uniqueFieldKeys;
+    for (auto const &schema : schemas) {
+        QVERIFY(!schema.typeKey.isEmpty());
+        QVERIFY(!schema.propertyKey.isEmpty());
+        QVERIFY(!schema.labelObjectName.isEmpty());
+        QVERIFY(!schema.widgetObjectName.isEmpty());
+        const QString fieldKey = schema.typeKey + QStringLiteral("/") + schema.propertyKey;
+        QVERIFY(!uniqueFieldKeys.contains(fieldKey));
+        uniqueFieldKeys.insert(fieldKey);
+    }
+
+    auto const promptUserSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorFieldSchema const &schema) {
+        return schema.typeKey == QStringLiteral("prompt") && schema.propertyKey == QStringLiteral("userPromptTemplate");
+    });
+    QVERIFY(promptUserSchema != schemas.cend());
+    QCOMPARE(promptUserSchema->labelObjectName, QStringLiteral("inspectorPromptUserTemplateLabel"));
+    QCOMPARE(promptUserSchema->widgetObjectName, QStringLiteral("inspectorPromptUserTemplateEdit"));
+}
+
+void MainWindowTests::exposesStableInspectorSectionSchemaObjectNames()
+{
+    const auto schemas = builtInInspectorSectionSchemas();
+    QCOMPARE(schemas.size(), 6);
+
+    QSet<QString> uniqueTypeKeys;
+    for (auto const &schema : schemas) {
+        QVERIFY(!schema.typeKey.isEmpty());
+        QVERIFY(!schema.displayName.isEmpty());
+        QVERIFY(!schema.sectionTitle.isEmpty());
+        QVERIFY(!uniqueTypeKeys.contains(schema.typeKey));
+        uniqueTypeKeys.insert(schema.typeKey);
+        if (schema.typeKey == QStringLiteral("prompt") || schema.typeKey == QStringLiteral("llm")
+            || schema.typeKey == QStringLiteral("tool")) {
+            QVERIFY(!schema.sectionObjectName.isEmpty());
+        }
+    }
+
+    auto const toolSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("tool");
+    });
+    QVERIFY(toolSchema != schemas.cend());
+    QCOMPARE(toolSchema->sectionObjectName, QStringLiteral("inspectorToolSection"));
+    QCOMPARE(toolSchema->sectionTitle, QStringLiteral("Tool Settings"));
+}
+
+void MainWindowTests::exposesStableInspectorSectionSchemaCopy()
+{
+    const auto schemas = builtInInspectorSectionSchemas();
+
+    auto const promptSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("prompt");
+    });
+    auto const outputSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("output");
+    });
+
+    QVERIFY(promptSchema != schemas.cend());
+    QVERIFY(outputSchema != schemas.cend());
+
+    QCOMPARE(promptSchema->summaryText, QStringLiteral("Edit the prompt template and runtime text for this node."));
+    QCOMPARE(promptSchema->displayName, QStringLiteral("Prompt"));
+    QVERIFY(!promptSchema->showsEmptyState);
+    QCOMPARE(outputSchema->displayName, QStringLiteral("Output"));
+    QCOMPARE(outputSchema->sectionTitle, QStringLiteral("General Settings"));
+    QCOMPARE(outputSchema->summaryText, QStringLiteral("This node represents the workflow result."));
+    QVERIFY(outputSchema->showsEmptyState);
+    QCOMPARE(outputSchema->emptyStateText, QStringLiteral("This node has no advanced settings."));
 }
 
 void MainWindowTests::retranslatesInspectorFieldLabelsAtRuntime()

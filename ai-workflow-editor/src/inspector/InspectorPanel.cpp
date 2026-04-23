@@ -67,49 +67,6 @@ void refreshWidgetStyle(QWidget *widget)
     widget->update();
 }
 
-QLabel *fieldLabelForPropertyKey(QString const &propertyKey, InspectorPanel *panel)
-{
-    if (propertyKey == QStringLiteral("systemPrompt"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorPromptSystemLabel"));
-    if (propertyKey == QStringLiteral("userPromptTemplate"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorPromptUserTemplateLabel"));
-    if (propertyKey == QStringLiteral("modelName"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorLlmModelNameLabel"));
-    if (propertyKey == QStringLiteral("temperature"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorLlmTemperatureLabel"));
-    if (propertyKey == QStringLiteral("maxTokens"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorLlmMaxTokensLabel"));
-    if (propertyKey == QStringLiteral("toolName"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorToolNameLabel"));
-    if (propertyKey == QStringLiteral("timeoutMs"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorToolTimeoutLabel"));
-    if (propertyKey == QStringLiteral("inputMapping"))
-        return panel->findChild<QLabel *>(QStringLiteral("inspectorToolInputMappingLabel"));
-
-    return nullptr;
-}
-
-QWidget *fieldWidgetForPropertyKey(QString const &propertyKey, InspectorPanel *panel)
-{
-    if (propertyKey == QStringLiteral("systemPrompt"))
-        return panel->findChild<QTextEdit *>(QStringLiteral("inspectorPromptSystemEdit"));
-    if (propertyKey == QStringLiteral("userPromptTemplate"))
-        return panel->findChild<QTextEdit *>(QStringLiteral("inspectorPromptUserTemplateEdit"));
-    if (propertyKey == QStringLiteral("modelName"))
-        return panel->findChild<QLineEdit *>(QStringLiteral("inspectorLlmModelNameEdit"));
-    if (propertyKey == QStringLiteral("temperature"))
-        return panel->findChild<QDoubleSpinBox *>(QStringLiteral("inspectorLlmTemperatureSpin"));
-    if (propertyKey == QStringLiteral("maxTokens"))
-        return panel->findChild<QSpinBox *>(QStringLiteral("inspectorLlmMaxTokensSpin"));
-    if (propertyKey == QStringLiteral("toolName"))
-        return panel->findChild<QLineEdit *>(QStringLiteral("inspectorToolNameEdit"));
-    if (propertyKey == QStringLiteral("timeoutMs"))
-        return panel->findChild<QSpinBox *>(QStringLiteral("inspectorToolTimeoutSpin"));
-    if (propertyKey == QStringLiteral("inputMapping"))
-        return panel->findChild<QTextEdit *>(QStringLiteral("inspectorToolInputMappingEdit"));
-
-    return nullptr;
-}
 }
 
 InspectorPanel::InspectorPanel(QWidget *parent)
@@ -319,8 +276,11 @@ void InspectorPanel::initializePropertyFieldBindings()
 {
     _propertyFields.clear();
     for (auto const &schema : builtInInspectorFieldSchemas()) {
-        _propertyFields.push_back(
-            {schema, fieldLabelForPropertyKey(schema.propertyKey, this), fieldWidgetForPropertyKey(schema.propertyKey, this)});
+        auto *label = findChild<QLabel *>(schema.labelObjectName);
+        auto *widget = findChild<QWidget *>(schema.widgetObjectName);
+        Q_ASSERT(label != nullptr);
+        Q_ASSERT(widget != nullptr);
+        _propertyFields.push_back({schema, label, widget});
     }
 
     for (auto const &binding : _propertyFields) {
@@ -485,61 +445,55 @@ void InspectorPanel::updateValidationLabel()
 
 void InspectorPanel::setTypeSpecificSectionVisible(QString const &typeKey)
 {
-    const bool isPrompt = typeKey == QStringLiteral("prompt");
-    const bool isLlm = typeKey == QStringLiteral("llm");
-    const bool isTool = typeKey == QStringLiteral("tool");
+    bool showsEmptyState = false;
+    QString emptyStateText;
+    for (auto const &sectionSchema : builtInInspectorSectionSchemas()) {
+        auto *section = findChild<QWidget *>(sectionSchema.sectionObjectName);
+        if (section == nullptr && !sectionSchema.sectionObjectName.isEmpty())
+            continue;
 
-    _promptSection->setVisible(isPrompt);
-    _llmSection->setVisible(isLlm);
-    _toolSection->setVisible(isTool);
-    _emptyStateLabel->setVisible(!typeKey.isEmpty() && !isPrompt && !isLlm && !isTool);
+        const bool isVisible = sectionSchema.typeKey == typeKey;
+        if (section != nullptr)
+            section->setVisible(isVisible);
+
+        if (isVisible) {
+            showsEmptyState = sectionSchema.showsEmptyState;
+            emptyStateText = sectionSchema.emptyStateText;
+        }
+    }
+
+    _emptyStateLabel->setText(emptyStateText.isEmpty() ? tr("This node has no advanced settings.")
+                                                       : tr(emptyStateText.toUtf8().constData()));
+    _emptyStateLabel->setVisible(!typeKey.isEmpty() && showsEmptyState);
     setPropertyFieldEnabledForType(typeKey);
 }
 
 QString InspectorPanel::typeDisplayName(QString const &typeKey) const
 {
-    if (typeKey == QStringLiteral("prompt"))
-        return tr("Prompt");
-    if (typeKey == QStringLiteral("llm"))
-        return tr("LLM");
-    if (typeKey == QStringLiteral("tool"))
-        return tr("Tool");
-    if (typeKey == QStringLiteral("start"))
-        return tr("Start");
-    if (typeKey == QStringLiteral("condition"))
-        return tr("Condition");
-    if (typeKey == QStringLiteral("output"))
-        return tr("Output");
+    for (auto const &schema : builtInInspectorSectionSchemas()) {
+        if (schema.typeKey == typeKey)
+            return tr(schema.displayName.toUtf8().constData());
+    }
 
     return QString();
 }
 
 QString InspectorPanel::typeSummary(QString const &typeKey) const
 {
-    if (typeKey == QStringLiteral("prompt"))
-        return tr("Edit the prompt template and runtime text for this node.");
-    if (typeKey == QStringLiteral("llm"))
-        return tr("Configure the model and generation parameters for this node.");
-    if (typeKey == QStringLiteral("tool"))
-        return tr("Configure the tool call, timeout, and input mapping.");
-    if (typeKey == QStringLiteral("start"))
-        return tr("This is the workflow entry point.");
-    if (typeKey == QStringLiteral("condition"))
-        return tr("This node controls workflow branching.");
-    if (typeKey == QStringLiteral("output"))
-        return tr("This node represents the workflow result.");
+    for (auto const &schema : builtInInspectorSectionSchemas()) {
+        if (schema.typeKey == typeKey)
+            return tr(schema.summaryText.toUtf8().constData());
+    }
 
     return QString();
 }
 
 QString InspectorPanel::sectionTitle(QString const &typeKey) const
 {
-    if (typeKey == QStringLiteral("prompt"))
-        return tr("Prompt Settings");
-    if (typeKey == QStringLiteral("llm"))
-        return tr("Model Settings");
-    if (typeKey == QStringLiteral("tool"))
-        return tr("Tool Settings");
+    for (auto const &schema : builtInInspectorSectionSchemas()) {
+        if (schema.typeKey == typeKey)
+            return tr(schema.sectionTitle.toUtf8().constData());
+    }
 
     return tr("General Settings");
 }
