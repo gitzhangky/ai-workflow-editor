@@ -96,6 +96,26 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     , _llmTemperatureSpin(new QDoubleSpinBox(this))
     , _llmMaxTokensLabel(new QLabel(this))
     , _llmMaxTokensSpin(new QSpinBox(this))
+    , _memorySection(nullptr)
+    , _memoryKeyLabel(new QLabel(this))
+    , _memoryKeyEdit(new QLineEdit(this))
+    , _retrieverSection(nullptr)
+    , _retrieverKeyLabel(new QLabel(this))
+    , _retrieverKeyEdit(new QLineEdit(this))
+    , _templateVariablesSection(nullptr)
+    , _templateVariablesLabel(new QLabel(this))
+    , _templateVariablesEdit(new QTextEdit(this))
+    , _httpRequestSection(nullptr)
+    , _httpRequestMethodLabel(new QLabel(this))
+    , _httpRequestMethodEdit(new QLineEdit(this))
+    , _httpRequestUrlLabel(new QLabel(this))
+    , _httpRequestUrlEdit(new QLineEdit(this))
+    , _httpRequestHeadersLabel(new QLabel(this))
+    , _httpRequestHeadersEdit(new QTextEdit(this))
+    , _httpRequestBodyLabel(new QLabel(this))
+    , _httpRequestBodyEdit(new QTextEdit(this))
+    , _httpRequestTimeoutLabel(new QLabel(this))
+    , _httpRequestTimeoutSpin(new QSpinBox(this))
     , _toolSection(nullptr)
     , _toolNameLabel(new QLabel(this))
     , _toolNameEdit(new QLineEdit(this))
@@ -160,6 +180,48 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     llmFormLayout->addRow(_llmModelNameLabel, _llmModelNameEdit);
     llmFormLayout->addRow(_llmTemperatureLabel, _llmTemperatureSpin);
     llmFormLayout->addRow(_llmMaxTokensLabel, _llmMaxTokensSpin);
+
+    _memorySection = createSectionWidget(this, layout);
+    _memorySection->setObjectName("inspectorMemorySection");
+    _memoryKeyLabel->setObjectName("inspectorMemoryKeyLabel");
+    _memoryKeyEdit->setObjectName("inspectorMemoryKeyEdit");
+    auto *memoryFormLayout = qobject_cast<QFormLayout *>(_memorySection->layout());
+    memoryFormLayout->addRow(_memoryKeyLabel, _memoryKeyEdit);
+
+    _retrieverSection = createSectionWidget(this, layout);
+    _retrieverSection->setObjectName("inspectorRetrieverSection");
+    _retrieverKeyLabel->setObjectName("inspectorRetrieverKeyLabel");
+    _retrieverKeyEdit->setObjectName("inspectorRetrieverKeyEdit");
+    auto *retrieverFormLayout = qobject_cast<QFormLayout *>(_retrieverSection->layout());
+    retrieverFormLayout->addRow(_retrieverKeyLabel, _retrieverKeyEdit);
+
+    _templateVariablesSection = createSectionWidget(this, layout);
+    _templateVariablesSection->setObjectName("inspectorTemplateVariablesSection");
+    _templateVariablesLabel->setObjectName("inspectorTemplateVariablesLabel");
+    _templateVariablesEdit->setObjectName("inspectorTemplateVariablesEdit");
+    auto *templateVariablesFormLayout = qobject_cast<QFormLayout *>(_templateVariablesSection->layout());
+    templateVariablesFormLayout->addRow(_templateVariablesLabel, _templateVariablesEdit);
+
+    _httpRequestSection = createSectionWidget(this, layout);
+    _httpRequestSection->setObjectName("inspectorHttpRequestSection");
+    _httpRequestMethodLabel->setObjectName("inspectorHttpRequestMethodLabel");
+    _httpRequestMethodEdit->setObjectName("inspectorHttpRequestMethodEdit");
+    _httpRequestUrlLabel->setObjectName("inspectorHttpRequestUrlLabel");
+    _httpRequestUrlEdit->setObjectName("inspectorHttpRequestUrlEdit");
+    _httpRequestHeadersLabel->setObjectName("inspectorHttpRequestHeadersLabel");
+    _httpRequestHeadersEdit->setObjectName("inspectorHttpRequestHeadersEdit");
+    _httpRequestBodyLabel->setObjectName("inspectorHttpRequestBodyLabel");
+    _httpRequestBodyEdit->setObjectName("inspectorHttpRequestBodyEdit");
+    _httpRequestTimeoutLabel->setObjectName("inspectorHttpRequestTimeoutLabel");
+    _httpRequestTimeoutSpin->setObjectName("inspectorHttpRequestTimeoutSpin");
+    _httpRequestTimeoutSpin->setRange(0, 600000);
+    _httpRequestTimeoutSpin->setSingleStep(1000);
+    auto *httpRequestFormLayout = qobject_cast<QFormLayout *>(_httpRequestSection->layout());
+    httpRequestFormLayout->addRow(_httpRequestMethodLabel, _httpRequestMethodEdit);
+    httpRequestFormLayout->addRow(_httpRequestUrlLabel, _httpRequestUrlEdit);
+    httpRequestFormLayout->addRow(_httpRequestHeadersLabel, _httpRequestHeadersEdit);
+    httpRequestFormLayout->addRow(_httpRequestBodyLabel, _httpRequestBodyEdit);
+    httpRequestFormLayout->addRow(_httpRequestTimeoutLabel, _httpRequestTimeoutSpin);
 
     _toolSection = createSectionWidget(this, layout);
     _toolSection->setObjectName("inspectorToolSection");

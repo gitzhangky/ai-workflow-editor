@@ -7,6 +7,8 @@ It summarizes the current product state, code layout, build commands, compatibil
 
 The goal is to let a new coding agent pick up the project without reconstructing the whole conversation history.
 
+If the goal is to understand how the current app is supposed to be used, read `docs/user-guide.md` first.
+
 ## Product Direction Lock
 
 This project direction must not drift.
@@ -30,6 +32,8 @@ If the answer is not clearly yes, the feature is likely out of scope or should b
 
 ## Project Boundaries
 
+- Repository root: `/Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeeditor`
+- Product project: `/Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeeditor/ai-workflow-editor`
 - Product app: `ai-workflow-editor/`
 - Third-party dependency: `third_party/nodeeditor/`
 - Do not place product docs inside `third_party/nodeeditor/`.
@@ -48,6 +52,10 @@ Implemented today:
   - `start`
   - `prompt`
   - `llm`
+  - `memory`
+  - `retriever`
+  - `templateVariables`
+  - `httpRequest`
   - `tool`
   - `condition`
   - `output`
@@ -57,9 +65,17 @@ Implemented today:
 - Type-specific inspector fields for:
   - `prompt`
   - `llm`
+  - `memory`
+  - `retriever`
+  - `templateVariables`
+  - `httpRequest`
   - `tool`
 - Structured node property persistence via JSON save/load.
-- Basic connection validation.
+- Node validation surfaces are synchronized across:
+  - inspector validation message
+  - node card warning / error state
+  - status bar selection summary
+- Structural connection validation with immediate invalid-drag feedback.
 - Runtime language switching between Chinese and English.
 - Default language is Chinese and language preference is persisted.
 - Custom node card painter and custom node geometry for improved visual styling.
@@ -69,27 +85,34 @@ Implemented today:
   - search
   - card-style grouped rendering
 - Basic automated tests for app shell, theme, node library, language behavior, save/load, and canvas behaviors.
+- Toolbar is grouped and visually refreshed for the current light workbench style.
+- Undo / redo currently covers:
+  - node creation
+  - node property edits from Inspector
+  - node deletion
+  - connection creation
+  - connection deletion
+- Dirty state is aligned with undo stack clean state.
+- User-facing operation guide now exists in `docs/user-guide.md`.
 
-Implemented in Phase 1 (2026-04-22):
+Documentation rule:
 
-- Dirty-state tracking: `workflowModified()` signal from `QtNodesEditorWidget`, `_dirty` flag in `MainWindow`
-- Window title shows `*` prefix when unsaved, filename after save
-- Close/new/open confirmation dialog when document is dirty (`maybeSave()`)
-- Save As action in File menu
-- Recent files menu (persisted via QSettings, max 10 entries)
-- Chinese translations for all new UI strings
+- Any user-visible feature change should update:
+  - `docs/user-guide.md`
+  - `docs/README.md`
 
 Not implemented yet:
 
 - Workflow execution engine
-- Undo/redo wiring to real editing commands
-- Context menus and deletion flows
-- Rich node validation and inline error presentation
 - Search/filter inside the canvas
-- Property schemas for all node types
 - Plugin system
 - Packaging/deployment
 - Windows CI
+- Full runtime semantics for integration / retrieval nodes
+- More advanced node types after the current minimal vertical slices:
+  - `json transform`
+  - `agent`
+  - `chat output`
 
 ## Important Product Decisions
 
@@ -100,6 +123,71 @@ Not implemented yet:
 - The editor currently focuses on composition and persistence, not execution.
 - The long-term role of the product is to orchestrate external AI capabilities, not to implement the models themselves.
 - `QVariantMap` is intentionally used for node property storage at this stage because node types are still evolving.
+- New node work should continue as editor-side authoring features first:
+  - definition
+  - ports
+  - inspector
+  - validation
+  - persistence
+  - icon
+  - tests
+  before any execution/runtime behavior is considered.
+
+## Handoff Snapshot
+
+This handoff reflects the state after the following development waves were completed locally and pushed from `main`:
+
+- editing reliability
+  - delete connection undo/redo
+  - create connection undo/redo
+  - action enable/disable state sync
+  - dirty/clean alignment with undo stack
+- validation consolidation
+  - prompt / llm / tool / flow validation unified through one rule path
+  - field-level validation highlighting in Inspector
+- inspector maintainability
+  - field schema extraction
+  - section schema extraction
+  - placeholder / help text / runtime retranslation handled through schema
+- node-language expansion minimal slices
+  - `memory`
+  - `retriever`
+  - `templateVariables`
+  - `httpRequest`
+- user documentation
+  - first-run usage guide
+  - quick-start and FAQ
+  - node-specific examples for current built-in nodes
+
+## Recommended Immediate Next Step
+
+If a new coding agent opens this project now, the recommended next task is:
+
+`Implement the minimal vertical slice for json transform.`
+
+That slice should follow the same pattern as `memory`, `retriever`, `templateVariables`, and `httpRequest`:
+
+- add the built-in node definition
+- add icon and node library entry
+- add Inspector schema + fields
+- add validation rules
+- ensure save/load persistence works
+- update `docs/user-guide.md`
+- add tests first in:
+  - `tests/domain/BuiltInNodeRegistryTests.cpp`
+  - `tests/app/MainWindowTests.cpp`
+
+After `json transform`, continue the current recommended order from `docs/plans/2026-04-23-beta-usability-priority-plan.md`:
+
+1. `agent`
+2. `chat output`
+3. cross-platform hardening and CI
+
+Before starting new implementation work, read:
+
+1. `docs/user-guide.md`
+2. `docs/2026-04-22-claude-code-handoff.md`
+3. `docs/plans/2026-04-23-beta-usability-priority-plan.md`
 
 ## Code Map
 
@@ -115,9 +203,10 @@ Not implemented yet:
 - `src/app/MainWindow.cpp`
   - Main workbench shell
   - Menus, toolbar, docks, language menu, file open/save/save-as actions
-  - Dirty-state tracking (`markDirty`, `clearDirty`, `updateWindowTitle`)
+  - Dirty-state tracking and clean-state sync (`markDirty`, `clearDirty`, `updateWindowTitle`)
   - Close/new/open unsaved confirmation (`maybeSave`, `closeEvent`)
   - Recent files menu (`addToRecentFiles`, `rebuildRecentFilesMenu`, persisted in QSettings)
+  - Action enablement sync for delete / undo / redo / center / select all
   - Node library creation and population
   - Wires editor and inspector together
 
@@ -159,8 +248,15 @@ Not implemented yet:
 - `src/inspector/InspectorPanel.hpp`
 - `src/inspector/InspectorPanel.cpp`
   - Shared name/description editing
-  - Type-specific sections for prompt, llm, tool
+  - Schema-driven type-specific sections and fields
+  - Field-level validation highlighting
   - Runtime retranslation
+
+- `src/inspector/InspectorFieldSchema.hpp`
+- `src/inspector/InspectorFieldSchema.cpp`
+  - Inspector field and section schema definitions
+  - Stable object-name contract for tests
+  - Placeholder/help text metadata
 
 ### QtNodes Adapter Layer
 
@@ -172,6 +268,8 @@ Not implemented yet:
   - Save/load workflow JSON
   - Selection propagation
   - Node style application
+  - Undo/redo command stack orchestration
+  - Validation result creation for node cards / inspector / status bar
   - Emits `workflowModified()` on any document mutation
 
 - `src/qtnodes/StaticNodeDelegateModel.hpp`
@@ -218,6 +316,13 @@ To launch:
 
 ```bash
 ./ai-workflow-editor/build/ai-workflow-editor
+```
+
+Full verification command currently expected after each feature slice:
+
+```bash
+cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeeditor/ai-workflow-editor/build --target ai_workflow_editor_domain_tests ai_workflow_editor_app_tests ai_workflow_editor_theme_tests ai_workflow_editor_widget_tests ai-workflow-editor
+ctest --test-dir /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeeditor/ai-workflow-editor/build --output-on-failure
 ```
 
 ## Compatibility Notes

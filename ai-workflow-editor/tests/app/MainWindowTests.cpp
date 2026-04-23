@@ -107,6 +107,10 @@ private slots:
     void avoidsExtraNodeGraphicsShadow();
     void syncsSelectedNodeIntoInspectorAndBack();
     void showsTypeSpecificInspectorFieldsForPromptLlmAndTool();
+    void showsTypeSpecificInspectorFieldsForMemory();
+    void showsTypeSpecificInspectorFieldsForRetriever();
+    void showsTypeSpecificInspectorFieldsForTemplateVariables();
+    void showsTypeSpecificInspectorFieldsForHttpRequest();
     void exposesStableInspectorFieldMetadata();
     void exposesStableInspectorFieldHintMetadata();
     void exposesStableInspectorFieldSchemaObjectNames();
@@ -117,6 +121,10 @@ private slots:
     void showsTypeSpecificInspectorHeaderAndEmptyState();
     void appliesDistinctNodeCardStylesByType();
     void marksIncompletePromptNodeWithWarningValidationState();
+    void marksIncompleteMemoryNodeWithWarningValidationState();
+    void marksIncompleteRetrieverNodeWithWarningValidationState();
+    void marksInvalidTemplateVariablesNodeWithValidationState();
+    void marksInvalidHttpRequestNodeWithValidationState();
     void marksInvalidToolNodeWithErrorValidationState();
     void marksFlowNodesWithStructuralWarningsBasedOnConnections();
     void showsValidationMessageInInspectorForSelectedNode();
@@ -131,6 +139,10 @@ private slots:
     void enablesDeleteActionForSelectedConnections();
     void enforcesConnectionRulesBetweenCompatiblePorts();
     void savesAndLoadsWorkflowJson();
+    void savesAndLoadsMemoryNodeProperties();
+    void savesAndLoadsRetrieverNodeProperties();
+    void savesAndLoadsTemplateVariablesNodeProperties();
+    void savesAndLoadsHttpRequestNodeProperties();
     void tracksDirtyStateOnEdits();
     void clearsDirtyStateOnSave();
     void clearsDirtyStateOnLoad();
@@ -189,7 +201,7 @@ void MainWindowTests::createsNodeLibraryAndInspectorDocks()
 
     auto *nodeLibrary = window.findChild<QListWidget *>("nodeLibraryList");
     QVERIFY(nodeLibrary != nullptr);
-    QCOMPARE(nodeLibrary->count(), 9);
+    QCOMPARE(nodeLibrary->count(), 13);
     QCOMPARE(nodeLibrary->item(1)->text(), QString::fromUtf8("开始"));
 }
 
@@ -444,7 +456,7 @@ void MainWindowTests::groupsNodeLibraryIntoCategorySections()
     auto *nodeLibrary = window.findChild<QListWidget *>("nodeLibraryList");
     QVERIFY(nodeLibrary != nullptr);
 
-    QCOMPARE(nodeLibrary->count(), 9);
+    QCOMPARE(nodeLibrary->count(), 13);
     QCOMPARE(nodeLibrary->item(0)->text(), QString::fromUtf8("流程"));
     QCOMPARE(nodeLibrary->item(0)->data(Qt::UserRole + 1).toString(), QString());
     QVERIFY(!(nodeLibrary->item(0)->flags() & Qt::ItemIsDragEnabled));
@@ -454,8 +466,12 @@ void MainWindowTests::groupsNodeLibraryIntoCategorySections()
     QCOMPARE(nodeLibrary->item(4)->text(), QString::fromUtf8("AI"));
     QCOMPARE(nodeLibrary->item(5)->text(), QString::fromUtf8("提示词"));
     QCOMPARE(nodeLibrary->item(6)->text(), QString::fromUtf8("大模型"));
-    QCOMPARE(nodeLibrary->item(8)->text(), QString::fromUtf8("工具"));
-    QCOMPARE(nodeLibrary->item(7)->text(), QString::fromUtf8("集成"));
+    QCOMPARE(nodeLibrary->item(7)->text(), QString::fromUtf8("记忆"));
+    QCOMPARE(nodeLibrary->item(8)->text(), QString::fromUtf8("检索器"));
+    QCOMPARE(nodeLibrary->item(9)->text(), QString::fromUtf8("模板变量"));
+    QCOMPARE(nodeLibrary->item(10)->text(), QString::fromUtf8("集成"));
+    QCOMPARE(nodeLibrary->item(11)->text(), QString::fromUtf8("HTTP 请求"));
+    QCOMPARE(nodeLibrary->item(12)->text(), QString::fromUtf8("工具"));
 }
 
 void MainWindowTests::addsSearchBoxForNodeLibraryFiltering()
@@ -673,6 +689,134 @@ void MainWindowTests::showsTypeSpecificInspectorFieldsForPromptLlmAndTool()
     QCOMPARE(editor->selectedNodeProperty("inputMapping").toString(), QString("{\"query\": \"{{input}}\"}"));
 }
 
+void MainWindowTests::showsTypeSpecificInspectorFieldsForMemory()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *memoryKeyLabel = window.findChild<QLabel *>("inspectorMemoryKeyLabel");
+    auto *memoryKeyEdit = window.findChild<QLineEdit *>("inspectorMemoryKeyEdit");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(memoryKeyLabel != nullptr);
+    QVERIFY(memoryKeyEdit != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto memoryNode = editor->createNode("memory");
+    editor->selectNode(memoryNode);
+
+    QVERIFY(memoryKeyLabel->isVisibleTo(&window));
+    QVERIFY(memoryKeyEdit->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    memoryKeyEdit->setText("conversation_summary");
+    QCOMPARE(editor->selectedNodeProperty("memoryKey").toString(), QString("conversation_summary"));
+}
+
+void MainWindowTests::showsTypeSpecificInspectorFieldsForRetriever()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *retrieverKeyLabel = window.findChild<QLabel *>("inspectorRetrieverKeyLabel");
+    auto *retrieverKeyEdit = window.findChild<QLineEdit *>("inspectorRetrieverKeyEdit");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(retrieverKeyLabel != nullptr);
+    QVERIFY(retrieverKeyEdit != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto retrieverNode = editor->createNode("retriever");
+    editor->selectNode(retrieverNode);
+
+    QVERIFY(retrieverKeyLabel->isVisibleTo(&window));
+    QVERIFY(retrieverKeyEdit->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    retrieverKeyEdit->setText("knowledge_base_search");
+    QCOMPARE(editor->selectedNodeProperty("retrieverKey").toString(), QString("knowledge_base_search"));
+}
+
+void MainWindowTests::showsTypeSpecificInspectorFieldsForTemplateVariables()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *variablesLabel = window.findChild<QLabel *>("inspectorTemplateVariablesLabel");
+    auto *variablesEdit = window.findChild<QTextEdit *>("inspectorTemplateVariablesEdit");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(variablesLabel != nullptr);
+    QVERIFY(variablesEdit != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto templateVariablesNode = editor->createNode("templateVariables");
+    editor->selectNode(templateVariablesNode);
+
+    QVERIFY(variablesLabel->isVisibleTo(&window));
+    QVERIFY(variablesEdit->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    variablesEdit->setPlainText("{\"topic\": \"{{input}}\"}");
+    QCOMPARE(editor->selectedNodeProperty("variablesJson").toString(), QString("{\"topic\": \"{{input}}\"}"));
+}
+
+void MainWindowTests::showsTypeSpecificInspectorFieldsForHttpRequest()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *methodLabel = window.findChild<QLabel *>("inspectorHttpRequestMethodLabel");
+    auto *methodEdit = window.findChild<QLineEdit *>("inspectorHttpRequestMethodEdit");
+    auto *urlLabel = window.findChild<QLabel *>("inspectorHttpRequestUrlLabel");
+    auto *urlEdit = window.findChild<QLineEdit *>("inspectorHttpRequestUrlEdit");
+    auto *headersEdit = window.findChild<QTextEdit *>("inspectorHttpRequestHeadersEdit");
+    auto *bodyEdit = window.findChild<QTextEdit *>("inspectorHttpRequestBodyEdit");
+    auto *timeoutSpin = window.findChild<QSpinBox *>("inspectorHttpRequestTimeoutSpin");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(methodLabel != nullptr);
+    QVERIFY(methodEdit != nullptr);
+    QVERIFY(urlLabel != nullptr);
+    QVERIFY(urlEdit != nullptr);
+    QVERIFY(headersEdit != nullptr);
+    QVERIFY(bodyEdit != nullptr);
+    QVERIFY(timeoutSpin != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto httpRequestNode = editor->createNode("httpRequest");
+    editor->selectNode(httpRequestNode);
+
+    QVERIFY(methodLabel->isVisibleTo(&window));
+    QVERIFY(methodEdit->isVisibleTo(&window));
+    QVERIFY(urlLabel->isVisibleTo(&window));
+    QVERIFY(urlEdit->isVisibleTo(&window));
+    QVERIFY(headersEdit->isVisibleTo(&window));
+    QVERIFY(bodyEdit->isVisibleTo(&window));
+    QVERIFY(timeoutSpin->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    methodEdit->setText("POST");
+    urlEdit->setText("https://api.example.com/search");
+    headersEdit->setPlainText("{\"Authorization\": \"Bearer {{token}}\"}");
+    bodyEdit->setPlainText("{\"query\": \"{{input}}\"}");
+    timeoutSpin->setValue(45000);
+
+    QCOMPARE(editor->selectedNodeProperty("method").toString(), QString("POST"));
+    QCOMPARE(editor->selectedNodeProperty("url").toString(), QString("https://api.example.com/search"));
+    QCOMPARE(editor->selectedNodeProperty("headersJson").toString(), QString("{\"Authorization\": \"Bearer {{token}}\"}"));
+    QCOMPARE(editor->selectedNodeProperty("bodyTemplate").toString(), QString("{\"query\": \"{{input}}\"}"));
+    QCOMPARE(editor->selectedNodeProperty("timeoutMs").toInt(), 45000);
+}
+
 void MainWindowTests::exposesStableInspectorFieldMetadata()
 {
     LanguageManager languageManager;
@@ -768,7 +912,7 @@ void MainWindowTests::exposesStableInspectorFieldSchemaObjectNames()
 void MainWindowTests::exposesStableInspectorSectionSchemaObjectNames()
 {
     const auto schemas = builtInInspectorSectionSchemas();
-    QCOMPARE(schemas.size(), 6);
+    QCOMPARE(schemas.size(), 10);
 
     QSet<QString> uniqueTypeKeys;
     for (auto const &schema : schemas) {
@@ -778,6 +922,10 @@ void MainWindowTests::exposesStableInspectorSectionSchemaObjectNames()
         QVERIFY(!uniqueTypeKeys.contains(schema.typeKey));
         uniqueTypeKeys.insert(schema.typeKey);
         if (schema.typeKey == QStringLiteral("prompt") || schema.typeKey == QStringLiteral("llm")
+            || schema.typeKey == QStringLiteral("memory")
+            || schema.typeKey == QStringLiteral("retriever")
+            || schema.typeKey == QStringLiteral("templateVariables")
+            || schema.typeKey == QStringLiteral("httpRequest")
             || schema.typeKey == QStringLiteral("tool")) {
             QVERIFY(!schema.sectionObjectName.isEmpty());
         }
@@ -798,16 +946,45 @@ void MainWindowTests::exposesStableInspectorSectionSchemaCopy()
     auto const promptSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
         return schema.typeKey == QStringLiteral("prompt");
     });
+    auto const memorySchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("memory");
+    });
+    auto const retrieverSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("retriever");
+    });
+    auto const templateVariablesSchema =
+        std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+            return schema.typeKey == QStringLiteral("templateVariables");
+        });
+    auto const httpRequestSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("httpRequest");
+    });
     auto const outputSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
         return schema.typeKey == QStringLiteral("output");
     });
 
     QVERIFY(promptSchema != schemas.cend());
+    QVERIFY(memorySchema != schemas.cend());
+    QVERIFY(retrieverSchema != schemas.cend());
+    QVERIFY(templateVariablesSchema != schemas.cend());
+    QVERIFY(httpRequestSchema != schemas.cend());
     QVERIFY(outputSchema != schemas.cend());
 
     QCOMPARE(promptSchema->summaryText, QStringLiteral("Edit the prompt template and runtime text for this node."));
     QCOMPARE(promptSchema->displayName, QStringLiteral("Prompt"));
     QVERIFY(!promptSchema->showsEmptyState);
+    QCOMPARE(memorySchema->displayName, QStringLiteral("Memory"));
+    QCOMPARE(memorySchema->sectionTitle, QStringLiteral("Memory Settings"));
+    QVERIFY(!memorySchema->showsEmptyState);
+    QCOMPARE(retrieverSchema->displayName, QStringLiteral("Retriever"));
+    QCOMPARE(retrieverSchema->sectionTitle, QStringLiteral("Retriever Settings"));
+    QVERIFY(!retrieverSchema->showsEmptyState);
+    QCOMPARE(templateVariablesSchema->displayName, QStringLiteral("Template Variables"));
+    QCOMPARE(templateVariablesSchema->sectionTitle, QStringLiteral("Template Variables Settings"));
+    QVERIFY(!templateVariablesSchema->showsEmptyState);
+    QCOMPARE(httpRequestSchema->displayName, QStringLiteral("HTTP Request"));
+    QCOMPARE(httpRequestSchema->sectionTitle, QStringLiteral("HTTP Request Settings"));
+    QVERIFY(!httpRequestSchema->showsEmptyState);
     QCOMPARE(outputSchema->displayName, QStringLiteral("Output"));
     QCOMPARE(outputSchema->sectionTitle, QStringLiteral("General Settings"));
     QCOMPARE(outputSchema->summaryText, QStringLiteral("This node represents the workflow result."));
@@ -984,6 +1161,149 @@ void MainWindowTests::marksIncompletePromptNodeWithWarningValidationState()
     promptUserEdit->setPlainText("Summarize {{input}}");
 
     QCOMPARE(editor->nodeValidationState(promptNode), QString("valid"));
+}
+
+void MainWindowTests::marksIncompleteMemoryNodeWithWarningValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *memoryKeyLabel = window.findChild<QLabel *>("inspectorMemoryKeyLabel");
+    auto *memoryKeyEdit = window.findChild<QLineEdit *>("inspectorMemoryKeyEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(memoryKeyLabel != nullptr);
+    QVERIFY(memoryKeyEdit != nullptr);
+
+    const auto memoryNode = editor->createNode("memory");
+    editor->selectNode(memoryNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("记忆键不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("记忆键不能为空")));
+    QCOMPARE(memoryKeyLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(memoryKeyEdit->property("validationState").toString(), QString("warning"));
+
+    memoryKeyEdit->setText("conversation_summary");
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(memoryKeyLabel->property("validationState").toString(), QString());
+    QCOMPARE(memoryKeyEdit->property("validationState").toString(), QString());
+}
+
+void MainWindowTests::marksIncompleteRetrieverNodeWithWarningValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *retrieverKeyLabel = window.findChild<QLabel *>("inspectorRetrieverKeyLabel");
+    auto *retrieverKeyEdit = window.findChild<QLineEdit *>("inspectorRetrieverKeyEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(retrieverKeyLabel != nullptr);
+    QVERIFY(retrieverKeyEdit != nullptr);
+
+    const auto retrieverNode = editor->createNode("retriever");
+    editor->selectNode(retrieverNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("检索器键不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("检索器键不能为空")));
+    QCOMPARE(retrieverKeyLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(retrieverKeyEdit->property("validationState").toString(), QString("warning"));
+
+    retrieverKeyEdit->setText("knowledge_base_search");
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(retrieverKeyLabel->property("validationState").toString(), QString());
+    QCOMPARE(retrieverKeyEdit->property("validationState").toString(), QString());
+}
+
+void MainWindowTests::marksInvalidTemplateVariablesNodeWithValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *variablesLabel = window.findChild<QLabel *>("inspectorTemplateVariablesLabel");
+    auto *variablesEdit = window.findChild<QTextEdit *>("inspectorTemplateVariablesEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(variablesLabel != nullptr);
+    QVERIFY(variablesEdit != nullptr);
+
+    const auto templateVariablesNode = editor->createNode("templateVariables");
+    editor->selectNode(templateVariablesNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("模板变量不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("模板变量不能为空")));
+    QCOMPARE(variablesLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(variablesEdit->property("validationState").toString(), QString("warning"));
+
+    variablesEdit->setPlainText("{bad json}");
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("模板变量必须是合法的 JSON 对象。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("模板变量必须是合法的 JSON 对象")));
+    QCOMPARE(variablesLabel->property("validationState").toString(), QString("error"));
+    QCOMPARE(variablesEdit->property("validationState").toString(), QString("error"));
+
+    variablesEdit->setPlainText("{\"topic\": \"{{input}}\"}");
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(variablesLabel->property("validationState").toString(), QString());
+    QCOMPARE(variablesEdit->property("validationState").toString(), QString());
+}
+
+void MainWindowTests::marksInvalidHttpRequestNodeWithValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *urlLabel = window.findChild<QLabel *>("inspectorHttpRequestUrlLabel");
+    auto *urlEdit = window.findChild<QLineEdit *>("inspectorHttpRequestUrlEdit");
+    auto *headersLabel = window.findChild<QLabel *>("inspectorHttpRequestHeadersLabel");
+    auto *headersEdit = window.findChild<QTextEdit *>("inspectorHttpRequestHeadersEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(urlLabel != nullptr);
+    QVERIFY(urlEdit != nullptr);
+    QVERIFY(headersLabel != nullptr);
+    QVERIFY(headersEdit != nullptr);
+
+    const auto httpRequestNode = editor->createNode("httpRequest");
+    editor->selectNode(httpRequestNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("请求 URL 不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("请求 URL 不能为空")));
+    QCOMPARE(urlLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(urlEdit->property("validationState").toString(), QString("warning"));
+
+    urlEdit->setText("https://api.example.com/search");
+    headersEdit->setPlainText("{bad json}");
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("请求头必须是合法的 JSON 对象。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("请求头必须是合法的 JSON 对象")));
+    QCOMPARE(headersLabel->property("validationState").toString(), QString("error"));
+    QCOMPARE(headersEdit->property("validationState").toString(), QString("error"));
+
+    headersEdit->setPlainText("{\"Authorization\": \"Bearer {{token}}\"}");
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(headersLabel->property("validationState").toString(), QString());
+    QCOMPARE(headersEdit->property("validationState").toString(), QString());
 }
 
 void MainWindowTests::marksInvalidToolNodeWithErrorValidationState()
@@ -1471,6 +1791,152 @@ void MainWindowTests::savesAndLoadsWorkflowJson()
     QCOMPARE(restoredEditor->selectedNodeProperty("modelName").toString(), QString("demo-model"));
     QCOMPARE(restoredEditor->selectedNodeProperty("temperature").toDouble(), 0.35);
     QCOMPARE(restoredEditor->selectedNodeProperty("maxTokens").toInt(), 4096);
+}
+
+void MainWindowTests::savesAndLoadsMemoryNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("memory-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *memoryKeyEdit = window.findChild<QLineEdit *>("inspectorMemoryKeyEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(memoryKeyEdit != nullptr);
+
+    const auto memoryNode = editor->createNode("memory");
+    editor->selectNode(memoryNode);
+    memoryKeyEdit->setText("conversation_summary");
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredMemoryNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("记忆"));
+    QVERIFY(restoredMemoryNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredMemoryNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("memoryKey").toString(), QString("conversation_summary"));
+}
+
+void MainWindowTests::savesAndLoadsRetrieverNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("retriever-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *retrieverKeyEdit = window.findChild<QLineEdit *>("inspectorRetrieverKeyEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(retrieverKeyEdit != nullptr);
+
+    const auto retrieverNode = editor->createNode("retriever");
+    editor->selectNode(retrieverNode);
+    retrieverKeyEdit->setText("knowledge_base_search");
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredRetrieverNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("检索器"));
+    QVERIFY(restoredRetrieverNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredRetrieverNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("retrieverKey").toString(), QString("knowledge_base_search"));
+}
+
+void MainWindowTests::savesAndLoadsTemplateVariablesNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("template-variables-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *variablesEdit = window.findChild<QTextEdit *>("inspectorTemplateVariablesEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(variablesEdit != nullptr);
+
+    const auto templateVariablesNode = editor->createNode("templateVariables");
+    editor->selectNode(templateVariablesNode);
+    variablesEdit->setPlainText("{\"topic\": \"{{input}}\"}");
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredTemplateVariablesNode =
+        restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("模板变量"));
+    QVERIFY(restoredTemplateVariablesNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredTemplateVariablesNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("variablesJson").toString(), QString("{\"topic\": \"{{input}}\"}"));
+}
+
+void MainWindowTests::savesAndLoadsHttpRequestNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("http-request-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *methodEdit = window.findChild<QLineEdit *>("inspectorHttpRequestMethodEdit");
+    auto *urlEdit = window.findChild<QLineEdit *>("inspectorHttpRequestUrlEdit");
+    auto *headersEdit = window.findChild<QTextEdit *>("inspectorHttpRequestHeadersEdit");
+    auto *bodyEdit = window.findChild<QTextEdit *>("inspectorHttpRequestBodyEdit");
+    auto *timeoutSpin = window.findChild<QSpinBox *>("inspectorHttpRequestTimeoutSpin");
+    QVERIFY(editor != nullptr);
+    QVERIFY(methodEdit != nullptr);
+    QVERIFY(urlEdit != nullptr);
+    QVERIFY(headersEdit != nullptr);
+    QVERIFY(bodyEdit != nullptr);
+    QVERIFY(timeoutSpin != nullptr);
+
+    const auto httpRequestNode = editor->createNode("httpRequest");
+    editor->selectNode(httpRequestNode);
+    methodEdit->setText("POST");
+    urlEdit->setText("https://api.example.com/search");
+    headersEdit->setPlainText("{\"Authorization\": \"Bearer {{token}}\"}");
+    bodyEdit->setPlainText("{\"query\": \"{{input}}\"}");
+    timeoutSpin->setValue(45000);
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredHttpRequestNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("HTTP 请求"));
+    QVERIFY(restoredHttpRequestNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredHttpRequestNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("method").toString(), QString("POST"));
+    QCOMPARE(restoredEditor->selectedNodeProperty("url").toString(), QString("https://api.example.com/search"));
+    QCOMPARE(restoredEditor->selectedNodeProperty("headersJson").toString(),
+             QString("{\"Authorization\": \"Bearer {{token}}\"}"));
+    QCOMPARE(restoredEditor->selectedNodeProperty("bodyTemplate").toString(), QString("{\"query\": \"{{input}}\"}"));
+    QCOMPARE(restoredEditor->selectedNodeProperty("timeoutMs").toInt(), 45000);
 }
 
 void MainWindowTests::tracksDirtyStateOnEdits()

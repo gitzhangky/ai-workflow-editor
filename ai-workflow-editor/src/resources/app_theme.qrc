@@ -5,9 +5,13 @@
     <file>icons/nodes/flow.svg</file>
     <file>icons/nodes/integration.svg</file>
     <file>icons/nodes/llm.svg</file>
+    <file>icons/nodes/memory.svg</file>
     <file>icons/nodes/output.svg</file>
     <file>icons/nodes/prompt.svg</file>
+    <file>icons/nodes/retriever.svg</file>
     <file>icons/nodes/start.svg</file>
+    <file>icons/nodes/templateVariables.svg</file>
+    <file>icons/nodes/httpRequest.svg</file>
     <file>icons/nodes/tool.svg</file>
     <file>icons/toolbar/center.svg</file>
     <file>icons/toolbar/delete.svg</file>

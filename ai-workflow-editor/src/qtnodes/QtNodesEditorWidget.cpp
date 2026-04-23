@@ -1329,6 +1329,38 @@ QVariantMap QtNodesEditorWidget::nodeStyleForType(QString const &typeKey, QVaria
         style.GradientColor2 = QColor(QStringLiteral("#F4E0E5"));
         style.GradientColor3 = QColor(QStringLiteral("#EBCFD7"));
         style.FilledConnectionPointColor = QColor(QStringLiteral("#B88693"));
+    } else if (typeKey == QStringLiteral("memory")) {
+        style.NormalBoundaryColor = QColor(QStringLiteral("#9BAF88"));
+        style.SelectedBoundaryColor = QColor(QStringLiteral("#6F875A"));
+        style.GradientColor0 = QColor(QStringLiteral("#FBFCF7"));
+        style.GradientColor1 = QColor(QStringLiteral("#F2F6EA"));
+        style.GradientColor2 = QColor(QStringLiteral("#E7EFD9"));
+        style.GradientColor3 = QColor(QStringLiteral("#D8E5C3"));
+        style.FilledConnectionPointColor = QColor(QStringLiteral("#88A16E"));
+    } else if (typeKey == QStringLiteral("retriever")) {
+        style.NormalBoundaryColor = QColor(QStringLiteral("#7FA7B7"));
+        style.SelectedBoundaryColor = QColor(QStringLiteral("#537B8B"));
+        style.GradientColor0 = QColor(QStringLiteral("#F7FBFC"));
+        style.GradientColor1 = QColor(QStringLiteral("#EAF4F7"));
+        style.GradientColor2 = QColor(QStringLiteral("#DCECF1"));
+        style.GradientColor3 = QColor(QStringLiteral("#CDE2EA"));
+        style.FilledConnectionPointColor = QColor(QStringLiteral("#6992A3"));
+    } else if (typeKey == QStringLiteral("templateVariables")) {
+        style.NormalBoundaryColor = QColor(QStringLiteral("#B79D74"));
+        style.SelectedBoundaryColor = QColor(QStringLiteral("#8C744E"));
+        style.GradientColor0 = QColor(QStringLiteral("#FCFAF6"));
+        style.GradientColor1 = QColor(QStringLiteral("#F5F0E6"));
+        style.GradientColor2 = QColor(QStringLiteral("#ECE3D2"));
+        style.GradientColor3 = QColor(QStringLiteral("#E0D3BC"));
+        style.FilledConnectionPointColor = QColor(QStringLiteral("#9E8460"));
+    } else if (typeKey == QStringLiteral("httpRequest")) {
+        style.NormalBoundaryColor = QColor(QStringLiteral("#8C9FB9"));
+        style.SelectedBoundaryColor = QColor(QStringLiteral("#607693"));
+        style.GradientColor0 = QColor(QStringLiteral("#F8FAFD"));
+        style.GradientColor1 = QColor(QStringLiteral("#EDF2F8"));
+        style.GradientColor2 = QColor(QStringLiteral("#E0E8F2"));
+        style.GradientColor3 = QColor(QStringLiteral("#D1DDEB"));
+        style.FilledConnectionPointColor = QColor(QStringLiteral("#7289A6"));
     } else if (typeKey == QStringLiteral("tool")) {
         style.NormalBoundaryColor = QColor(QStringLiteral("#8EB2AA"));
         style.SelectedBoundaryColor = QColor(QStringLiteral("#5E857D"));
@@ -1399,6 +1431,75 @@ QtNodesEditorWidget::ValidationResult QtNodesEditorWidget::validationResultFor(Q
             result.message = tr("Model name is required.");
             result.propertyKey = QStringLiteral("modelName");
         }
+        return result;
+    }
+
+    if (typeKey == QStringLiteral("memory")) {
+        if (trimmed(QStringLiteral("memoryKey")).isEmpty()) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Memory key is required.");
+            result.propertyKey = QStringLiteral("memoryKey");
+        }
+        return result;
+    }
+
+    if (typeKey == QStringLiteral("retriever")) {
+        if (trimmed(QStringLiteral("retrieverKey")).isEmpty()) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Retriever key is required.");
+            result.propertyKey = QStringLiteral("retrieverKey");
+        }
+        return result;
+    }
+
+    if (typeKey == QStringLiteral("templateVariables")) {
+        const QString variablesJson = trimmed(QStringLiteral("variablesJson"));
+        if (variablesJson.isEmpty() || variablesJson == QStringLiteral("{}")) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Template variables cannot be empty.");
+            result.propertyKey = QStringLiteral("variablesJson");
+            return result;
+        }
+
+        QJsonParseError parseError;
+        const auto document = QJsonDocument::fromJson(variablesJson.toUtf8(), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+            result.state = QtNodes::NodeValidationState::State::Error;
+            result.message = tr("Template variables must be a valid JSON object.");
+            result.propertyKey = QStringLiteral("variablesJson");
+            return result;
+        }
+
+        if (document.object().isEmpty()) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Template variables cannot be empty.");
+            result.propertyKey = QStringLiteral("variablesJson");
+            return result;
+        }
+
+        return result;
+    }
+
+    if (typeKey == QStringLiteral("httpRequest")) {
+        if (trimmed(QStringLiteral("url")).isEmpty()) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Request URL is required.");
+            result.propertyKey = QStringLiteral("url");
+            return result;
+        }
+
+        const QString headersJson = trimmed(QStringLiteral("headersJson"));
+        if (!headersJson.isEmpty()) {
+            QJsonParseError parseError;
+            const auto document = QJsonDocument::fromJson(headersJson.toUtf8(), &parseError);
+            if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                result.state = QtNodes::NodeValidationState::State::Error;
+                result.message = tr("Headers must be a valid JSON object.");
+                result.propertyKey = QStringLiteral("headersJson");
+                return result;
+            }
+        }
+
         return result;
     }
 

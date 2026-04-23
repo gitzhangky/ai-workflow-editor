@@ -88,6 +88,30 @@ private:
     QLabel *_llmMaxTokensLabel;
     QSpinBox *_llmMaxTokensSpin;
 
+    QWidget *_memorySection;
+    QLabel *_memoryKeyLabel;
+    QLineEdit *_memoryKeyEdit;
+
+    QWidget *_retrieverSection;
+    QLabel *_retrieverKeyLabel;
+    QLineEdit *_retrieverKeyEdit;
+
+    QWidget *_templateVariablesSection;
+    QLabel *_templateVariablesLabel;
+    QTextEdit *_templateVariablesEdit;
+
+    QWidget *_httpRequestSection;
+    QLabel *_httpRequestMethodLabel;
+    QLineEdit *_httpRequestMethodEdit;
+    QLabel *_httpRequestUrlLabel;
+    QLineEdit *_httpRequestUrlEdit;
+    QLabel *_httpRequestHeadersLabel;
+    QTextEdit *_httpRequestHeadersEdit;
+    QLabel *_httpRequestBodyLabel;
+    QTextEdit *_httpRequestBodyEdit;
+    QLabel *_httpRequestTimeoutLabel;
+    QSpinBox *_httpRequestTimeoutSpin;
+
     QWidget *_toolSection;
     QLabel *_toolNameLabel;
     QLineEdit *_toolNameEdit;
