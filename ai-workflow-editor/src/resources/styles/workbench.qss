@@ -224,6 +224,14 @@ QWidget#inspectorPanel QLabel {
     font-weight: 600;
 }
 
+QWidget#inspectorPanel QLabel[validationState="warning"] {
+    color: #8a6427;
+}
+
+QWidget#inspectorPanel QLabel[validationState="error"] {
+    color: #984b44;
+}
+
 QWidget#inspectorPanel QLineEdit,
 QWidget#inspectorPanel QSpinBox,
 QWidget#inspectorPanel QDoubleSpinBox,
@@ -234,6 +242,22 @@ QWidget#inspectorPanel QTextEdit {
     color: #2d241f;
     padding: 8px 10px;
     selection-background-color: #4b84d9;
+}
+
+QWidget#inspectorPanel QLineEdit[validationState="warning"],
+QWidget#inspectorPanel QSpinBox[validationState="warning"],
+QWidget#inspectorPanel QDoubleSpinBox[validationState="warning"],
+QWidget#inspectorPanel QTextEdit[validationState="warning"] {
+    background: #fff9ef;
+    border: 1px solid #e4c79a;
+}
+
+QWidget#inspectorPanel QLineEdit[validationState="error"],
+QWidget#inspectorPanel QSpinBox[validationState="error"],
+QWidget#inspectorPanel QDoubleSpinBox[validationState="error"],
+QWidget#inspectorPanel QTextEdit[validationState="error"] {
+    background: #fdf3f2;
+    border: 1px solid #debbb7;
 }
 
 QWidget#inspectorPanel QLineEdit:focus,

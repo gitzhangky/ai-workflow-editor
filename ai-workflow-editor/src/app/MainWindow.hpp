@@ -44,6 +44,7 @@ private:
     void markDirty();
     void clearDirty();
     void updateWindowTitle();
+    void updateWorkbenchActionStates();
     void updateSelectionValidationSummary(QString const &state, QString const &message);
     bool maybeSave();
     void addToRecentFiles(QString const &filePath);

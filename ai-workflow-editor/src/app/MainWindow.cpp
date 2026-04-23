@@ -218,8 +218,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_editorWidget,
             &QtNodesEditorWidget::selectedNodeValidationChanged,
             this,
-            [this](QString const &state, QString const &message) {
-                _inspectorPanel->setValidationFeedback(state, message);
+            [this](QString const &state, QString const &message, QString const &propertyKey) {
+                _inspectorPanel->setValidationFeedback(state, message, propertyKey);
                 updateSelectionValidationSummary(state, message);
             });
     connect(_editorWidget, &QtNodesEditorWidget::selectionCleared, this, [this]() {
@@ -247,6 +247,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
         else
             markDirty();
     });
+    connect(_editorWidget, &QtNodesEditorWidget::interactionStateChanged, this, &MainWindow::updateWorkbenchActionStates);
 
     _recentFilesMenu = new QMenu(this);
     _recentFilesMenu->setObjectName("recentFilesMenu");
@@ -330,6 +331,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     retranslateUi();
     populateNodeLibrary();
     updateLanguageActions();
+    updateWorkbenchActionStates();
 }
 
 MainWindow::~MainWindow()
@@ -377,6 +379,18 @@ bool MainWindow::loadWorkflowFromPath(QString const &filePath)
     }
 
     return loaded;
+}
+
+void MainWindow::updateWorkbenchActionStates()
+{
+    if (_editorWidget == nullptr)
+        return;
+
+    _undoAction->setEnabled(_editorWidget->canUndo());
+    _redoAction->setEnabled(_editorWidget->canRedo());
+    _deleteAction->setEnabled(_editorWidget->hasSelection());
+    _selectAllAction->setEnabled(_editorWidget->hasNodes());
+    _centerAction->setEnabled(_editorWidget->hasNodes());
 }
 
 NodeLibraryListWidget *MainWindow::createNodeLibrary()

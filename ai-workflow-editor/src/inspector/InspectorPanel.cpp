@@ -11,6 +11,8 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
+#include <memory>
+
 namespace
 {
 QWidget *createSectionWidget(QWidget *parent, QVBoxLayout *rootLayout)
@@ -25,11 +27,96 @@ QWidget *createSectionWidget(QWidget *parent, QVBoxLayout *rootLayout)
     rootLayout->addWidget(section);
     return section;
 }
+
+void setWidgetValue(QWidget *widget, QVariant const &value)
+{
+    if (auto *lineEdit = qobject_cast<QLineEdit *>(widget); lineEdit != nullptr) {
+        lineEdit->setText(value.toString());
+        return;
+    }
+    if (auto *textEdit = qobject_cast<QTextEdit *>(widget); textEdit != nullptr) {
+        textEdit->setPlainText(value.toString());
+        return;
+    }
+    if (auto *doubleSpinBox = qobject_cast<QDoubleSpinBox *>(widget); doubleSpinBox != nullptr) {
+        doubleSpinBox->setValue(value.toDouble());
+        return;
+    }
+    if (auto *spinBox = qobject_cast<QSpinBox *>(widget); spinBox != nullptr)
+        spinBox->setValue(value.toInt());
+}
+
+void setWidgetPlaceholderText(QWidget *widget, QString const &text)
+{
+    if (auto *lineEdit = qobject_cast<QLineEdit *>(widget); lineEdit != nullptr) {
+        lineEdit->setPlaceholderText(text);
+        return;
+    }
+
+    if (auto *textEdit = qobject_cast<QTextEdit *>(widget); textEdit != nullptr)
+        textEdit->setPlaceholderText(text);
+}
+
+void refreshWidgetStyle(QWidget *widget)
+{
+    if (widget == nullptr)
+        return;
+
+    widget->style()->unpolish(widget);
+    widget->style()->polish(widget);
+    widget->update();
+}
+
+QLabel *fieldLabelForPropertyKey(QString const &propertyKey, InspectorPanel *panel)
+{
+    if (propertyKey == QStringLiteral("systemPrompt"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorPromptSystemLabel"));
+    if (propertyKey == QStringLiteral("userPromptTemplate"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorPromptUserTemplateLabel"));
+    if (propertyKey == QStringLiteral("modelName"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorLlmModelNameLabel"));
+    if (propertyKey == QStringLiteral("temperature"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorLlmTemperatureLabel"));
+    if (propertyKey == QStringLiteral("maxTokens"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorLlmMaxTokensLabel"));
+    if (propertyKey == QStringLiteral("toolName"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorToolNameLabel"));
+    if (propertyKey == QStringLiteral("timeoutMs"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorToolTimeoutLabel"));
+    if (propertyKey == QStringLiteral("inputMapping"))
+        return panel->findChild<QLabel *>(QStringLiteral("inspectorToolInputMappingLabel"));
+
+    return nullptr;
+}
+
+QWidget *fieldWidgetForPropertyKey(QString const &propertyKey, InspectorPanel *panel)
+{
+    if (propertyKey == QStringLiteral("systemPrompt"))
+        return panel->findChild<QTextEdit *>(QStringLiteral("inspectorPromptSystemEdit"));
+    if (propertyKey == QStringLiteral("userPromptTemplate"))
+        return panel->findChild<QTextEdit *>(QStringLiteral("inspectorPromptUserTemplateEdit"));
+    if (propertyKey == QStringLiteral("modelName"))
+        return panel->findChild<QLineEdit *>(QStringLiteral("inspectorLlmModelNameEdit"));
+    if (propertyKey == QStringLiteral("temperature"))
+        return panel->findChild<QDoubleSpinBox *>(QStringLiteral("inspectorLlmTemperatureSpin"));
+    if (propertyKey == QStringLiteral("maxTokens"))
+        return panel->findChild<QSpinBox *>(QStringLiteral("inspectorLlmMaxTokensSpin"));
+    if (propertyKey == QStringLiteral("toolName"))
+        return panel->findChild<QLineEdit *>(QStringLiteral("inspectorToolNameEdit"));
+    if (propertyKey == QStringLiteral("timeoutMs"))
+        return panel->findChild<QSpinBox *>(QStringLiteral("inspectorToolTimeoutSpin"));
+    if (propertyKey == QStringLiteral("inputMapping"))
+        return panel->findChild<QTextEdit *>(QStringLiteral("inspectorToolInputMappingEdit"));
+
+    return nullptr;
+}
 }
 
 InspectorPanel::InspectorPanel(QWidget *parent)
     : QWidget(parent)
     , _currentTypeKey()
+    , _validationState()
+    , _validationPropertyKey()
     , _hintLabel(new QLabel(this))
     , _typeBadgeLabel(new QLabel(this))
     , _typeSummaryLabel(new QLabel(this))
@@ -92,7 +179,9 @@ InspectorPanel::InspectorPanel(QWidget *parent)
 
     _promptSection = createSectionWidget(this, layout);
     _promptSection->setObjectName("inspectorPromptSection");
+    _promptSystemLabel->setObjectName("inspectorPromptSystemLabel");
     _promptSystemEdit->setObjectName("inspectorPromptSystemEdit");
+    _promptUserTemplateLabel->setObjectName("inspectorPromptUserTemplateLabel");
     _promptUserTemplateEdit->setObjectName("inspectorPromptUserTemplateEdit");
     auto *promptFormLayout = qobject_cast<QFormLayout *>(_promptSection->layout());
     promptFormLayout->addRow(_promptSystemLabel, _promptSystemEdit);
@@ -100,11 +189,14 @@ InspectorPanel::InspectorPanel(QWidget *parent)
 
     _llmSection = createSectionWidget(this, layout);
     _llmSection->setObjectName("inspectorLlmSection");
+    _llmModelNameLabel->setObjectName("inspectorLlmModelNameLabel");
     _llmModelNameEdit->setObjectName("inspectorLlmModelNameEdit");
+    _llmTemperatureLabel->setObjectName("inspectorLlmTemperatureLabel");
     _llmTemperatureSpin->setObjectName("inspectorLlmTemperatureSpin");
     _llmTemperatureSpin->setRange(0.0, 2.0);
     _llmTemperatureSpin->setDecimals(2);
     _llmTemperatureSpin->setSingleStep(0.05);
+    _llmMaxTokensLabel->setObjectName("inspectorLlmMaxTokensLabel");
     _llmMaxTokensSpin->setObjectName("inspectorLlmMaxTokensSpin");
     _llmMaxTokensSpin->setRange(1, 200000);
     auto *llmFormLayout = qobject_cast<QFormLayout *>(_llmSection->layout());
@@ -114,15 +206,20 @@ InspectorPanel::InspectorPanel(QWidget *parent)
 
     _toolSection = createSectionWidget(this, layout);
     _toolSection->setObjectName("inspectorToolSection");
+    _toolNameLabel->setObjectName("inspectorToolNameLabel");
     _toolNameEdit->setObjectName("inspectorToolNameEdit");
+    _toolTimeoutLabel->setObjectName("inspectorToolTimeoutLabel");
     _toolTimeoutSpin->setObjectName("inspectorToolTimeoutSpin");
     _toolTimeoutSpin->setRange(0, 600000);
     _toolTimeoutSpin->setSingleStep(1000);
+    _toolInputMappingLabel->setObjectName("inspectorToolInputMappingLabel");
     _toolInputMappingEdit->setObjectName("inspectorToolInputMappingEdit");
     auto *toolFormLayout = qobject_cast<QFormLayout *>(_toolSection->layout());
     toolFormLayout->addRow(_toolNameLabel, _toolNameEdit);
     toolFormLayout->addRow(_toolTimeoutLabel, _toolTimeoutSpin);
     toolFormLayout->addRow(_toolInputMappingLabel, _toolInputMappingEdit);
+
+    initializePropertyFieldBindings();
 
     layout->addWidget(_emptyStateLabel);
     layout->addStretch();
@@ -131,33 +228,7 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     connect(_descriptionEdit, &QTextEdit::textChanged, this, [this]() {
         Q_EMIT descriptionEdited(_descriptionEdit->toPlainText());
     });
-    connect(_promptSystemEdit, &QTextEdit::textChanged, this, [this]() {
-        Q_EMIT propertyEdited(QStringLiteral("systemPrompt"), _promptSystemEdit->toPlainText());
-    });
-    connect(_promptUserTemplateEdit, &QTextEdit::textChanged, this, [this]() {
-        Q_EMIT propertyEdited(QStringLiteral("userPromptTemplate"), _promptUserTemplateEdit->toPlainText());
-    });
-    connect(_llmModelNameEdit, &QLineEdit::textChanged, this, [this](QString const &value) {
-        Q_EMIT propertyEdited(QStringLiteral("modelName"), value);
-    });
-    connect(_llmTemperatureSpin,
-            qOverload<double>(&QDoubleSpinBox::valueChanged),
-            this,
-            [this](double value) { Q_EMIT propertyEdited(QStringLiteral("temperature"), value); });
-    connect(_llmMaxTokensSpin,
-            qOverload<int>(&QSpinBox::valueChanged),
-            this,
-            [this](int value) { Q_EMIT propertyEdited(QStringLiteral("maxTokens"), value); });
-    connect(_toolNameEdit, &QLineEdit::textChanged, this, [this](QString const &value) {
-        Q_EMIT propertyEdited(QStringLiteral("toolName"), value);
-    });
-    connect(_toolTimeoutSpin,
-            qOverload<int>(&QSpinBox::valueChanged),
-            this,
-            [this](int value) { Q_EMIT propertyEdited(QStringLiteral("timeoutMs"), value); });
-    connect(_toolInputMappingEdit, &QTextEdit::textChanged, this, [this]() {
-        Q_EMIT propertyEdited(QStringLiteral("inputMapping"), _toolInputMappingEdit->toPlainText());
-    });
+    connectPropertyFieldSignals();
 
     retranslateUi();
     clearSelection();
@@ -177,55 +248,42 @@ void InspectorPanel::clearSelection()
 
     QSignalBlocker displayNameBlocker(_displayNameEdit);
     QSignalBlocker descriptionBlocker(_descriptionEdit);
-    QSignalBlocker promptSystemBlocker(_promptSystemEdit);
-    QSignalBlocker promptUserBlocker(_promptUserTemplateEdit);
-    QSignalBlocker llmModelBlocker(_llmModelNameEdit);
-    QSignalBlocker llmTemperatureBlocker(_llmTemperatureSpin);
-    QSignalBlocker llmMaxTokensBlocker(_llmMaxTokensSpin);
-    QSignalBlocker toolNameBlocker(_toolNameEdit);
-    QSignalBlocker toolTimeoutBlocker(_toolTimeoutSpin);
-    QSignalBlocker toolInputBlocker(_toolInputMappingEdit);
+    std::vector<std::unique_ptr<QSignalBlocker>> propertyFieldBlockers;
+    propertyFieldBlockers.reserve(_propertyFields.size());
+    for (auto const &binding : _propertyFields)
+        propertyFieldBlockers.push_back(std::make_unique<QSignalBlocker>(binding.widget));
 
     _displayNameEdit->clear();
     _descriptionEdit->clear();
-    _promptSystemEdit->clear();
-    _promptUserTemplateEdit->clear();
-    _llmModelNameEdit->clear();
-    _llmTemperatureSpin->setValue(0.0);
-    _llmMaxTokensSpin->setValue(1);
-    _toolNameEdit->clear();
-    _toolTimeoutSpin->setValue(0);
-    _toolInputMappingEdit->clear();
+    clearPropertyFieldValues();
     _typeBadgeLabel->clear();
     _typeSummaryLabel->clear();
     _sectionTitleLabel->clear();
     _validationState.clear();
+    _validationPropertyKey.clear();
     _validationLabel->clear();
     _validationLabel->setVisible(false);
     _validationLabel->setProperty("severity", QString());
     _validationLabel->style()->unpolish(_validationLabel);
     _validationLabel->style()->polish(_validationLabel);
+    clearPropertyFieldValidationState();
 
     for (auto *widget : {static_cast<QWidget *>(_displayNameEdit),
-                         static_cast<QWidget *>(_descriptionEdit),
-                         static_cast<QWidget *>(_promptSystemEdit),
-                         static_cast<QWidget *>(_promptUserTemplateEdit),
-                         static_cast<QWidget *>(_llmModelNameEdit),
-                         static_cast<QWidget *>(_llmTemperatureSpin),
-                         static_cast<QWidget *>(_llmMaxTokensSpin),
-                         static_cast<QWidget *>(_toolNameEdit),
-                         static_cast<QWidget *>(_toolTimeoutSpin),
-                         static_cast<QWidget *>(_toolInputMappingEdit)}) {
+                         static_cast<QWidget *>(_descriptionEdit)}) {
         widget->setEnabled(false);
     }
+    setPropertyFieldEnabledForType(QString());
 
     setTypeSpecificSectionVisible(QString());
 }
 
-void InspectorPanel::setValidationFeedback(QString const &state, QString const &message)
+void InspectorPanel::setValidationFeedback(QString const &state, QString const &message, QString const &propertyKey)
 {
     _validationState = state;
+    _validationPropertyKey = propertyKey;
     _validationLabel->setText(message);
+    clearPropertyFieldValidationState();
+    applyPropertyFieldValidationState(state, propertyKey, message);
     updateValidationLabel();
 }
 
@@ -238,28 +296,18 @@ void InspectorPanel::setSelectedNode(QString const &typeKey,
 
     QSignalBlocker displayNameBlocker(_displayNameEdit);
     QSignalBlocker descriptionBlocker(_descriptionEdit);
-    QSignalBlocker promptSystemBlocker(_promptSystemEdit);
-    QSignalBlocker promptUserBlocker(_promptUserTemplateEdit);
-    QSignalBlocker llmModelBlocker(_llmModelNameEdit);
-    QSignalBlocker llmTemperatureBlocker(_llmTemperatureSpin);
-    QSignalBlocker llmMaxTokensBlocker(_llmMaxTokensSpin);
-    QSignalBlocker toolNameBlocker(_toolNameEdit);
-    QSignalBlocker toolTimeoutBlocker(_toolTimeoutSpin);
-    QSignalBlocker toolInputBlocker(_toolInputMappingEdit);
+    std::vector<std::unique_ptr<QSignalBlocker>> propertyFieldBlockers;
+    propertyFieldBlockers.reserve(_propertyFields.size());
+    for (auto const &binding : _propertyFields)
+        propertyFieldBlockers.push_back(std::make_unique<QSignalBlocker>(binding.widget));
 
     _displayNameEdit->setEnabled(true);
     _descriptionEdit->setEnabled(true);
     _displayNameEdit->setText(displayName);
     _descriptionEdit->setPlainText(description);
 
-    _promptSystemEdit->setPlainText(properties.value(QStringLiteral("systemPrompt")).toString());
-    _promptUserTemplateEdit->setPlainText(properties.value(QStringLiteral("userPromptTemplate")).toString());
-    _llmModelNameEdit->setText(properties.value(QStringLiteral("modelName")).toString());
-    _llmTemperatureSpin->setValue(properties.value(QStringLiteral("temperature")).toDouble());
-    _llmMaxTokensSpin->setValue(properties.value(QStringLiteral("maxTokens"), 1).toInt());
-    _toolNameEdit->setText(properties.value(QStringLiteral("toolName")).toString());
-    _toolTimeoutSpin->setValue(properties.value(QStringLiteral("timeoutMs")).toInt());
-    _toolInputMappingEdit->setPlainText(properties.value(QStringLiteral("inputMapping")).toString());
+    applyPropertyFieldValues(properties);
+    clearPropertyFieldValidationState();
     _typeBadgeLabel->setText(typeDisplayName(typeKey));
     _typeSummaryLabel->setText(typeSummary(typeKey));
     _sectionTitleLabel->setText(sectionTitle(typeKey));
@@ -267,19 +315,149 @@ void InspectorPanel::setSelectedNode(QString const &typeKey,
     setTypeSpecificSectionVisible(typeKey);
 }
 
+void InspectorPanel::initializePropertyFieldBindings()
+{
+    _propertyFields.clear();
+    for (auto const &schema : builtInInspectorFieldSchemas()) {
+        _propertyFields.push_back(
+            {schema, fieldLabelForPropertyKey(schema.propertyKey, this), fieldWidgetForPropertyKey(schema.propertyKey, this)});
+    }
+
+    for (auto const &binding : _propertyFields) {
+        if (binding.label != nullptr)
+            binding.label->setProperty("inspectorPropertyKey", binding.schema.propertyKey);
+        binding.widget->setProperty("inspectorPropertyKey", binding.schema.propertyKey);
+        if (binding.label != nullptr)
+            binding.label->setProperty("inspectorTypeKey", binding.schema.typeKey);
+        binding.widget->setProperty("inspectorTypeKey", binding.schema.typeKey);
+        binding.widget->setProperty("inspectorPlaceholderTextSource", binding.schema.placeholderText);
+        binding.widget->setProperty("inspectorHelpTextSource", binding.schema.helpText);
+        if (binding.label != nullptr) {
+            binding.label->setProperty("inspectorPlaceholderTextSource", binding.schema.placeholderText);
+            binding.label->setProperty("inspectorHelpTextSource", binding.schema.helpText);
+        }
+    }
+}
+
+void InspectorPanel::connectPropertyFieldSignals()
+{
+    for (auto const &binding : _propertyFields) {
+        if (auto *lineEdit = qobject_cast<QLineEdit *>(binding.widget); lineEdit != nullptr) {
+            connect(lineEdit, &QLineEdit::textChanged, this, [this, key = binding.schema.propertyKey](QString const &value) {
+                Q_EMIT propertyEdited(key, value);
+            });
+            continue;
+        }
+
+        if (auto *textEdit = qobject_cast<QTextEdit *>(binding.widget); textEdit != nullptr) {
+            connect(textEdit, &QTextEdit::textChanged, this, [this, textEdit, key = binding.schema.propertyKey]() {
+                Q_EMIT propertyEdited(key, textEdit->toPlainText());
+            });
+            continue;
+        }
+
+        if (auto *doubleSpinBox = qobject_cast<QDoubleSpinBox *>(binding.widget); doubleSpinBox != nullptr) {
+            connect(doubleSpinBox,
+                    qOverload<double>(&QDoubleSpinBox::valueChanged),
+                    this,
+                    [this, key = binding.schema.propertyKey](double value) { Q_EMIT propertyEdited(key, value); });
+            continue;
+        }
+
+        if (auto *spinBox = qobject_cast<QSpinBox *>(binding.widget); spinBox != nullptr) {
+            connect(spinBox,
+                    qOverload<int>(&QSpinBox::valueChanged),
+                    this,
+                    [this, key = binding.schema.propertyKey](int value) { Q_EMIT propertyEdited(key, value); });
+        }
+    }
+}
+
+void InspectorPanel::clearPropertyFieldValues()
+{
+    for (auto const &binding : _propertyFields)
+        setWidgetValue(binding.widget, binding.schema.defaultValue);
+}
+
+void InspectorPanel::applyPropertyFieldValues(QVariantMap const &properties)
+{
+    for (auto const &binding : _propertyFields) {
+        const QVariant value = properties.contains(binding.schema.propertyKey) ? properties.value(binding.schema.propertyKey)
+                                                                               : binding.schema.defaultValue;
+        setWidgetValue(binding.widget, value);
+    }
+}
+
+void InspectorPanel::applyPropertyFieldHints()
+{
+    for (auto const &binding : _propertyFields) {
+        const QString placeholderText =
+            binding.schema.placeholderText.isEmpty() ? QString() : tr(binding.schema.placeholderText.toUtf8().constData());
+        const QString helpText =
+            binding.schema.helpText.isEmpty() ? QString() : tr(binding.schema.helpText.toUtf8().constData());
+
+        setWidgetPlaceholderText(binding.widget, placeholderText);
+        binding.widget->setToolTip(helpText);
+        if (binding.label != nullptr)
+            binding.label->setToolTip(helpText);
+    }
+}
+
+void InspectorPanel::setPropertyFieldEnabledForType(QString const &typeKey)
+{
+    for (auto const &binding : _propertyFields)
+        binding.widget->setEnabled(binding.schema.typeKey == typeKey);
+}
+
+void InspectorPanel::clearPropertyFieldValidationState()
+{
+    for (auto const &binding : _propertyFields) {
+        if (binding.label != nullptr) {
+            binding.label->setProperty("validationState", QString());
+            binding.label->setProperty("validationMessage", QString());
+            refreshWidgetStyle(binding.label);
+        }
+
+        binding.widget->setProperty("validationState", QString());
+        binding.widget->setProperty("validationMessage", QString());
+        refreshWidgetStyle(binding.widget);
+    }
+}
+
+void InspectorPanel::applyPropertyFieldValidationState(QString const &state,
+                                                       QString const &propertyKey,
+                                                       QString const &message)
+{
+    if ((state != QStringLiteral("warning") && state != QStringLiteral("error")) || propertyKey.trimmed().isEmpty())
+        return;
+
+    for (auto const &binding : _propertyFields) {
+        if (binding.schema.propertyKey != propertyKey)
+            continue;
+
+        if (binding.label != nullptr) {
+            binding.label->setProperty("validationState", state);
+            binding.label->setProperty("validationMessage", message);
+            refreshWidgetStyle(binding.label);
+        }
+
+        binding.widget->setProperty("validationState", state);
+        binding.widget->setProperty("validationMessage", message);
+        refreshWidgetStyle(binding.widget);
+        return;
+    }
+}
+
 void InspectorPanel::retranslateUi()
 {
     _hintLabel->setText(tr("Select a node to edit its configuration"));
     _displayNameLabel->setText(tr("Name"));
     _descriptionLabel->setText(tr("Description"));
-    _promptSystemLabel->setText(tr("System Prompt"));
-    _promptUserTemplateLabel->setText(tr("User Prompt Template"));
-    _llmModelNameLabel->setText(tr("Model Name"));
-    _llmTemperatureLabel->setText(tr("Temperature"));
-    _llmMaxTokensLabel->setText(tr("Max Tokens"));
-    _toolNameLabel->setText(tr("Tool Name"));
-    _toolTimeoutLabel->setText(tr("Timeout (ms)"));
-    _toolInputMappingLabel->setText(tr("Input Mapping"));
+    for (auto const &binding : _propertyFields) {
+        if (binding.label != nullptr)
+            binding.label->setText(tr(binding.schema.labelText.toUtf8().constData()));
+    }
+    applyPropertyFieldHints();
     _emptyStateLabel->setText(tr("This node has no advanced settings."));
 
     if (!_currentTypeKey.isEmpty()) {
@@ -289,6 +467,8 @@ void InspectorPanel::retranslateUi()
     }
 
     updateValidationLabel();
+    clearPropertyFieldValidationState();
+    applyPropertyFieldValidationState(_validationState, _validationPropertyKey, _validationLabel->text());
 }
 
 void InspectorPanel::updateValidationLabel()
@@ -313,22 +493,7 @@ void InspectorPanel::setTypeSpecificSectionVisible(QString const &typeKey)
     _llmSection->setVisible(isLlm);
     _toolSection->setVisible(isTool);
     _emptyStateLabel->setVisible(!typeKey.isEmpty() && !isPrompt && !isLlm && !isTool);
-
-    for (auto *widget : {static_cast<QWidget *>(_promptSystemEdit), static_cast<QWidget *>(_promptUserTemplateEdit)}) {
-        widget->setEnabled(isPrompt);
-    }
-
-    for (auto *widget : {static_cast<QWidget *>(_llmModelNameEdit),
-                         static_cast<QWidget *>(_llmTemperatureSpin),
-                         static_cast<QWidget *>(_llmMaxTokensSpin)}) {
-        widget->setEnabled(isLlm);
-    }
-
-    for (auto *widget : {static_cast<QWidget *>(_toolNameEdit),
-                         static_cast<QWidget *>(_toolTimeoutSpin),
-                         static_cast<QWidget *>(_toolInputMappingEdit)}) {
-        widget->setEnabled(isTool);
-    }
+    setPropertyFieldEnabledForType(typeKey);
 }
 
 QString InspectorPanel::typeDisplayName(QString const &typeKey) const

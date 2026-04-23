@@ -29,6 +29,7 @@ class QtNodesEditorWidget : public QWidget
     Q_OBJECT
 
     friend class NodeCreateCommand;
+    friend class ConnectionCreateCommand;
     friend class NodeDeleteSelectionCommand;
     friend class NodeDisplayNameEditCommand;
     friend class NodeDescriptionEditCommand;
@@ -73,6 +74,8 @@ public:
     QString descriptionForDisplayName(QString const &displayName) const;
     QtNodes::NodeId findNodeIdByDisplayName(QString const &displayName) const;
     QPointF portScenePosition(QtNodes::NodeId nodeId, QtNodes::PortType portType, QtNodes::PortIndex portIndex) const;
+    bool hasSelection() const;
+    bool hasNodes() const;
     bool canUndo() const;
     bool canRedo() const;
     bool isClean() const;
@@ -90,10 +93,11 @@ Q_SIGNALS:
                              QString const &displayName,
                              QString const &description,
                              QVariantMap const &properties);
-    void selectedNodeValidationChanged(QString const &state, QString const &message);
+    void selectedNodeValidationChanged(QString const &state, QString const &message, QString const &propertyKey);
     void selectionCleared();
     void workflowModified();
     void cleanStateChanged(bool clean);
+    void interactionStateChanged();
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -120,6 +124,13 @@ private:
         NodeState state;
     };
 
+    struct ValidationResult
+    {
+        QtNodes::NodeValidationState::State state = QtNodes::NodeValidationState::State::Valid;
+        QString message;
+        QString propertyKey;
+    };
+
     std::shared_ptr<QtNodes::NodeDelegateModelRegistry> buildRegistry() const;
     void applyWorkbenchStyles();
     QtNodes::NodeId createNodeInternal(QString const &typeKey, QPointF const &scenePosition = QPointF());
@@ -131,9 +142,16 @@ private:
     NodeSnapshot snapshotNode(QtNodes::NodeId nodeId) const;
     void refreshSelectedNodeState();
     void applyNodeStyle(QtNodes::NodeId nodeId, QString const &typeKey);
+    void refreshValidationForNode(QtNodes::NodeId nodeId);
+    void refreshValidationForConnectionEndpoints(QtNodes::ConnectionId const &connectionId);
     QVariantMap nodeStyleForType(QString const &typeKey,
                                  QVariantMap const &properties = QVariantMap()) const;
-    QtNodes::NodeValidationState validationStateFor(QString const &typeKey, QVariantMap const &properties) const;
+    ValidationResult validationResultFor(QtNodes::NodeId nodeId,
+                                         QString const &typeKey,
+                                         QVariantMap const &properties) const;
+    QtNodes::NodeValidationState validationStateFor(QtNodes::NodeId nodeId,
+                                                    QString const &typeKey,
+                                                    QVariantMap const &properties) const;
     void updateDropPreview(QString const &typeKey, QPoint const &position, bool viewportCoordinates);
     void clearDropPreview();
     void updateConnectionFeedback(QPoint const &viewportPoint);

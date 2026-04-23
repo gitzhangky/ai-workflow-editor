@@ -130,6 +130,9 @@ public:
             }
         }
 
+        for (auto const &connectionId : _connectionIds)
+            _editor->refreshValidationForConnectionEndpoints(connectionId);
+
         if (!_nodeSnapshots.empty())
             _editor->selectNode(_nodeSnapshots.front().nodeId);
         else
@@ -153,6 +156,9 @@ public:
                 _editor->deleteNodeInternal(snapshot.nodeId);
         }
 
+        for (auto const &connectionId : _connectionIds)
+            _editor->refreshValidationForConnectionEndpoints(connectionId);
+
         _editor->refreshSelectedNodeState();
         Q_EMIT _editor->workflowModified();
     }
@@ -161,6 +167,41 @@ private:
     QtNodesEditorWidget *_editor;
     std::vector<QtNodesEditorWidget::NodeSnapshot> _nodeSnapshots;
     std::unordered_set<QtNodes::ConnectionId> _connectionIds;
+};
+
+class ConnectionCreateCommand : public QUndoCommand
+{
+public:
+    ConnectionCreateCommand(QtNodesEditorWidget *editor, QtNodes::ConnectionId connectionId)
+        : _editor(editor)
+        , _connectionId(connectionId)
+    {}
+
+    void undo() override
+    {
+        if (_editor == nullptr || !_editor->_graphModel->connectionExists(_connectionId))
+            return;
+
+        _editor->_graphModel->deleteConnection(_connectionId);
+        _editor->refreshValidationForConnectionEndpoints(_connectionId);
+        Q_EMIT _editor->workflowModified();
+    }
+
+    void redo() override
+    {
+        if (_editor == nullptr || _editor->_graphModel->connectionExists(_connectionId)
+            || !_editor->_graphModel->connectionPossible(_connectionId)) {
+            return;
+        }
+
+        _editor->_graphModel->addConnection(_connectionId);
+        _editor->refreshValidationForConnectionEndpoints(_connectionId);
+        Q_EMIT _editor->workflowModified();
+    }
+
+private:
+    QtNodesEditorWidget *_editor;
+    QtNodes::ConnectionId _connectionId;
 };
 
 class NodeDisplayNameEditCommand : public QUndoCommand
@@ -331,6 +372,20 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
         handleNodeSelected(nodeId);
     });
     connect(&_scene->undoStack(), &QUndoStack::cleanChanged, this, &QtNodesEditorWidget::cleanStateChanged);
+    connect(&_scene->undoStack(), &QUndoStack::canUndoChanged, this, [this](bool) { Q_EMIT interactionStateChanged(); });
+    connect(&_scene->undoStack(), &QUndoStack::canRedoChanged, this, [this](bool) { Q_EMIT interactionStateChanged(); });
+    connect(_scene, &QGraphicsScene::selectionChanged, this, [this]() {
+        const auto nodeIds = selectedNodeIds();
+        if (!nodeIds.empty()) {
+            if (_selectedNodeId != nodeIds.front())
+                handleNodeSelected(nodeIds.front());
+        } else if (_selectedNodeId != QtNodes::InvalidNodeId) {
+            _selectedNodeId = QtNodes::InvalidNodeId;
+            Q_EMIT selectionCleared();
+        }
+
+        Q_EMIT interactionStateChanged();
+    });
 
     auto *deleteShortcut = new QShortcut(QKeySequence::Delete, this);
     connect(deleteShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
@@ -470,9 +525,7 @@ bool QtNodesEditorWidget::connectNodes(QtNodes::NodeId outNodeId,
     if (!_graphModel->connectionPossible(connectionId))
         return false;
 
-    _graphModel->addConnection(connectionId);
-    markCurrentStateDirty();
-    Q_EMIT workflowModified();
+    _scene->undoStack().push(new ConnectionCreateCommand(this, connectionId));
     return true;
 }
 
@@ -756,6 +809,16 @@ bool QtNodesEditorWidget::canUndo() const
     return _scene->undoStack().canUndo();
 }
 
+bool QtNodesEditorWidget::hasSelection() const
+{
+    return !_scene->selectedItems().isEmpty();
+}
+
+bool QtNodesEditorWidget::hasNodes() const
+{
+    return !_nodeStates.isEmpty();
+}
+
 bool QtNodesEditorWidget::canRedo() const
 {
     return _scene->undoStack().canRedo();
@@ -866,6 +929,24 @@ void QtNodesEditorWidget::refreshSelectedNodeState()
     Q_EMIT selectionCleared();
 }
 
+void QtNodesEditorWidget::refreshValidationForNode(QtNodes::NodeId nodeId)
+{
+    auto const nodeStateIt = _nodeStates.constFind(nodeId);
+    if (nodeStateIt == _nodeStates.cend() || !_graphModel->nodeExists(nodeId))
+        return;
+
+    applyNodeStyle(nodeId, nodeStateIt->typeKey);
+
+    if (_selectedNodeId == nodeId)
+        emitSelectedNodeValidation();
+}
+
+void QtNodesEditorWidget::refreshValidationForConnectionEndpoints(QtNodes::ConnectionId const &connectionId)
+{
+    refreshValidationForNode(connectionId.outNodeId);
+    refreshValidationForNode(connectionId.inNodeId);
+}
+
 void QtNodesEditorWidget::setSelectedNodeDisplayName(QString const &displayName)
 {
     auto nodeStateIt = _nodeStates.find(_selectedNodeId);
@@ -966,36 +1047,111 @@ bool QtNodesEditorWidget::loadWorkflow(QString const &filePath)
     if (!document.isObject())
         return false;
 
-    clearWorkflow();
-
     const auto root = document.object();
     const auto nodes = root["nodes"].toArray();
-    QHash<int, QtNodes::NodeId> nodeIdMap;
+    const auto connections = root["connections"].toArray();
+
+    struct ParsedNode
+    {
+        int serializedId = 0;
+        QString typeKey;
+        QString displayName;
+        QString description;
+        QVariantMap properties;
+        QPointF position;
+        bool displayNameCustomized = false;
+        bool descriptionCustomized = false;
+    };
+
+    struct ParsedConnection
+    {
+        int outSerializedNodeId = 0;
+        QtNodes::PortIndex outPortIndex = 0;
+        int inSerializedNodeId = 0;
+        QtNodes::PortIndex inPortIndex = 0;
+    };
+
+    std::vector<ParsedNode> parsedNodes;
+    parsedNodes.reserve(static_cast<std::size_t>(nodes.size()));
+    std::vector<ParsedConnection> parsedConnections;
+    parsedConnections.reserve(static_cast<std::size_t>(connections.size()));
+    QHash<int, QtNodes::NodeId> previewNodeIdMap;
+    QtNodes::DataFlowGraphModel previewModel(_registry);
 
     for (auto const &nodeValue : nodes) {
         const auto nodeObject = nodeValue.toObject();
         const auto positionObject = nodeObject["position"].toObject();
-        const auto nodeId = createNode(nodeObject["type"].toString(),
-                                       QPointF(positionObject["x"].toDouble(),
-                                               positionObject["y"].toDouble()));
+        const QString typeKey = nodeObject["type"].toString();
+        auto const *definition = _builtInNodeRegistry.find(typeKey);
+        if (definition == nullptr)
+            return false;
+
+        const int serializedId = nodeObject["id"].toInt(std::numeric_limits<int>::min());
+        if (serializedId == std::numeric_limits<int>::min() || previewNodeIdMap.contains(serializedId))
+            return false;
+
+        const auto previewNodeId = previewModel.addNode(typeKey);
+        if (previewNodeId == QtNodes::InvalidNodeId)
+            return false;
+
+        QVariantMap properties = nodeObject["properties"].toObject().toVariantMap();
+        for (auto it = definition->defaultProperties.cbegin(); it != definition->defaultProperties.cend(); ++it) {
+            if (!properties.contains(it.key()))
+                properties.insert(it.key(), it.value());
+        }
+
+        ParsedNode parsedNode;
+        parsedNode.serializedId = serializedId;
+        parsedNode.typeKey = typeKey;
+        parsedNode.displayName = nodeObject["displayName"].toString(definition->displayName);
+        parsedNode.description = nodeObject["description"].toString(definition->description);
+        parsedNode.properties = properties;
+        parsedNode.position = QPointF(positionObject["x"].toDouble(), positionObject["y"].toDouble());
+        parsedNode.displayNameCustomized = parsedNode.displayName != definition->displayName;
+        parsedNode.descriptionCustomized = parsedNode.description != definition->description;
+
+        previewNodeIdMap.insert(serializedId, previewNodeId);
+        parsedNodes.push_back(std::move(parsedNode));
+    }
+
+    for (auto const &connectionValue : connections) {
+        const auto connectionObject = connectionValue.toObject();
+        ParsedConnection parsedConnection;
+        parsedConnection.outSerializedNodeId = connectionObject["outNodeId"].toInt(std::numeric_limits<int>::min());
+        parsedConnection.outPortIndex =
+            static_cast<QtNodes::PortIndex>(connectionObject["outPortIndex"].toInt(std::numeric_limits<int>::min()));
+        parsedConnection.inSerializedNodeId = connectionObject["inNodeId"].toInt(std::numeric_limits<int>::min());
+        parsedConnection.inPortIndex =
+            static_cast<QtNodes::PortIndex>(connectionObject["inPortIndex"].toInt(std::numeric_limits<int>::min()));
+
+        const auto previewOutNodeId = previewNodeIdMap.value(parsedConnection.outSerializedNodeId, QtNodes::InvalidNodeId);
+        const auto previewInNodeId = previewNodeIdMap.value(parsedConnection.inSerializedNodeId, QtNodes::InvalidNodeId);
+        if (previewOutNodeId == QtNodes::InvalidNodeId || previewInNodeId == QtNodes::InvalidNodeId)
+            return false;
+
+        QtNodes::ConnectionId previewConnectionId{
+            previewOutNodeId, parsedConnection.outPortIndex, previewInNodeId, parsedConnection.inPortIndex};
+        if (!previewModel.connectionPossible(previewConnectionId))
+            return false;
+
+        previewModel.addConnection(previewConnectionId);
+        parsedConnections.push_back(parsedConnection);
+    }
+
+    clearWorkflow();
+
+    QHash<int, QtNodes::NodeId> nodeIdMap;
+    for (auto const &parsedNode : parsedNodes) {
+        const auto nodeId = createNodeInternal(parsedNode.typeKey, parsedNode.position);
         if (nodeId == QtNodes::InvalidNodeId)
             return false;
 
-        nodeIdMap.insert(nodeObject["id"].toInt(), nodeId);
-        auto const *definition = _builtInNodeRegistry.find(nodeObject["type"].toString());
-        _nodeStates[nodeId].displayName = nodeObject["displayName"].toString();
-        _nodeStates[nodeId].description = nodeObject["description"].toString();
-        _nodeStates[nodeId].properties = nodeObject["properties"].toObject().toVariantMap();
-        if (definition != nullptr) {
-            for (auto it = definition->defaultProperties.cbegin(); it != definition->defaultProperties.cend(); ++it) {
-                if (!_nodeStates[nodeId].properties.contains(it.key()))
-                    _nodeStates[nodeId].properties.insert(it.key(), it.value());
-            }
-        }
-        _nodeStates[nodeId].displayNameCustomized =
-            definition != nullptr && _nodeStates[nodeId].displayName != definition->displayName;
-        _nodeStates[nodeId].descriptionCustomized =
-            definition != nullptr && _nodeStates[nodeId].description != definition->description;
+        nodeIdMap.insert(parsedNode.serializedId, nodeId);
+        _nodeStates[nodeId].displayName = parsedNode.displayName;
+        _nodeStates[nodeId].description = parsedNode.description;
+        _nodeStates[nodeId].properties = parsedNode.properties;
+        _nodeStates[nodeId].displayNameCustomized = parsedNode.displayNameCustomized;
+        _nodeStates[nodeId].descriptionCustomized = parsedNode.descriptionCustomized;
 
         if (auto *model = _graphModel->delegateModel<StaticNodeDelegateModel>(nodeId); model != nullptr) {
             model->setDisplayName(_nodeStates[nodeId].displayName);
@@ -1003,21 +1159,20 @@ bool QtNodesEditorWidget::loadWorkflow(QString const &filePath)
         applyNodeStyle(nodeId, _nodeStates[nodeId].typeKey);
     }
 
-    const auto connections = root["connections"].toArray();
-    for (auto const &connectionValue : connections) {
-        const auto connectionObject = connectionValue.toObject();
-        const auto outNodeId = nodeIdMap.value(connectionObject["outNodeId"].toInt(), QtNodes::InvalidNodeId);
-        const auto inNodeId = nodeIdMap.value(connectionObject["inNodeId"].toInt(), QtNodes::InvalidNodeId);
-
+    for (auto const &parsedConnection : parsedConnections) {
+        const auto outNodeId = nodeIdMap.value(parsedConnection.outSerializedNodeId, QtNodes::InvalidNodeId);
+        const auto inNodeId = nodeIdMap.value(parsedConnection.inSerializedNodeId, QtNodes::InvalidNodeId);
         if (outNodeId == QtNodes::InvalidNodeId || inNodeId == QtNodes::InvalidNodeId)
             return false;
 
-        if (!connectNodes(outNodeId,
-                          static_cast<QtNodes::PortIndex>(connectionObject["outPortIndex"].toInt()),
-                          inNodeId,
-                          static_cast<QtNodes::PortIndex>(connectionObject["inPortIndex"].toInt()))) {
+        QtNodes::ConnectionId connectionId{
+            outNodeId, parsedConnection.outPortIndex, inNodeId, parsedConnection.inPortIndex};
+        if (!_graphModel->connectionPossible(connectionId)) {
             return false;
         }
+
+        _graphModel->addConnection(connectionId);
+        refreshValidationForConnectionEndpoints(connectionId);
     }
 
     if (!_nodeStates.isEmpty())
@@ -1114,7 +1269,7 @@ void QtNodesEditorWidget::applyNodeStyle(QtNodes::NodeId nodeId, QString const &
     const auto nodeStateIt = _nodeStates.constFind(nodeId);
     const QVariantMap properties = nodeStateIt != _nodeStates.cend() ? nodeStateIt->properties : QVariantMap();
     const QVariantMap styleMap = nodeStyleForType(typeKey, properties);
-    const auto validationState = validationStateFor(typeKey, properties);
+    const auto validationState = validationStateFor(nodeId, typeKey, properties);
 
     QtNodes::NodeStyle style;
     style.loadJson(QJsonObject::fromVariantMap(styleMap));
@@ -1187,33 +1342,72 @@ QVariantMap QtNodesEditorWidget::nodeStyleForType(QString const &typeKey, QVaria
     return style.toJson().toVariantMap();
 }
 
-QtNodes::NodeValidationState QtNodesEditorWidget::validationStateFor(QString const &typeKey,
-                                                                     QVariantMap const &properties) const
+QtNodesEditorWidget::ValidationResult QtNodesEditorWidget::validationResultFor(QtNodes::NodeId nodeId,
+                                                                               QString const &typeKey,
+                                                                               QVariantMap const &properties) const
 {
     auto const trimmed = [&](QString const &key) { return properties.value(key).toString().trimmed(); };
-    QtNodes::NodeValidationState state;
+    ValidationResult result;
+
+    if (_graphModel->nodeExists(nodeId)) {
+        auto const hasIncoming = [&](QtNodes::PortIndex portIndex) {
+            return !_graphModel->connections(nodeId, QtNodes::PortType::In, portIndex).empty();
+        };
+        auto const hasOutgoing = [&](QtNodes::PortIndex portIndex) {
+            return !_graphModel->connections(nodeId, QtNodes::PortType::Out, portIndex).empty();
+        };
+
+        if (typeKey == QStringLiteral("start") && !hasOutgoing(0)) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Start node must connect to the next step.");
+            return result;
+        }
+
+        if (typeKey == QStringLiteral("condition")) {
+            if (!hasIncoming(0)) {
+                result.state = QtNodes::NodeValidationState::State::Warning;
+                result.message = tr("Condition node requires an input connection.");
+                return result;
+            }
+
+            if (!hasOutgoing(0) || !hasOutgoing(1)) {
+                result.state = QtNodes::NodeValidationState::State::Warning;
+                result.message = tr("Condition node must connect both True and False branches.");
+                return result;
+            }
+        }
+
+        if (typeKey == QStringLiteral("output") && !hasIncoming(0)) {
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Output node requires an incoming connection.");
+            return result;
+        }
+    }
 
     if (typeKey == QStringLiteral("prompt")) {
         if (trimmed(QStringLiteral("userPromptTemplate")).isEmpty()) {
-            state._state = QtNodes::NodeValidationState::State::Warning;
-            state._stateMessage = tr("Prompt template is empty.");
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Prompt template is empty.");
+            result.propertyKey = QStringLiteral("userPromptTemplate");
         }
-        return state;
+        return result;
     }
 
     if (typeKey == QStringLiteral("llm")) {
         if (trimmed(QStringLiteral("modelName")).isEmpty()) {
-            state._state = QtNodes::NodeValidationState::State::Warning;
-            state._stateMessage = tr("Model name is required.");
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Model name is required.");
+            result.propertyKey = QStringLiteral("modelName");
         }
-        return state;
+        return result;
     }
 
     if (typeKey == QStringLiteral("tool")) {
         if (trimmed(QStringLiteral("toolName")).isEmpty()) {
-            state._state = QtNodes::NodeValidationState::State::Warning;
-            state._stateMessage = tr("Tool name is required.");
-            return state;
+            result.state = QtNodes::NodeValidationState::State::Warning;
+            result.message = tr("Tool name is required.");
+            result.propertyKey = QStringLiteral("toolName");
+            return result;
         }
 
         const QString inputMapping = trimmed(QStringLiteral("inputMapping"));
@@ -1221,13 +1415,25 @@ QtNodes::NodeValidationState QtNodesEditorWidget::validationStateFor(QString con
             QJsonParseError parseError;
             const auto document = QJsonDocument::fromJson(inputMapping.toUtf8(), &parseError);
             if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-                state._state = QtNodes::NodeValidationState::State::Error;
-                state._stateMessage = tr("Input mapping must be a valid JSON object.");
-                return state;
+                result.state = QtNodes::NodeValidationState::State::Error;
+                result.message = tr("Input mapping must be a valid JSON object.");
+                result.propertyKey = QStringLiteral("inputMapping");
+                return result;
             }
         }
     }
 
+    return result;
+}
+
+QtNodes::NodeValidationState QtNodesEditorWidget::validationStateFor(QtNodes::NodeId nodeId,
+                                                                     QString const &typeKey,
+                                                                     QVariantMap const &properties) const
+{
+    const ValidationResult result = validationResultFor(nodeId, typeKey, properties);
+    QtNodes::NodeValidationState state;
+    state._state = result.state;
+    state._stateMessage = result.message;
     return state;
 }
 
@@ -1366,11 +1572,18 @@ void QtNodesEditorWidget::handleNodeSelected(QtNodes::NodeId nodeId)
 void QtNodesEditorWidget::emitSelectedNodeValidation()
 {
     if (_selectedNodeId == QtNodes::InvalidNodeId) {
-        Q_EMIT selectedNodeValidationChanged(QString(), QString());
+        Q_EMIT selectedNodeValidationChanged(QString(), QString(), QString());
         return;
     }
 
-    Q_EMIT selectedNodeValidationChanged(nodeValidationState(_selectedNodeId), nodeValidationMessage(_selectedNodeId));
+    const auto nodeStateIt = _nodeStates.constFind(_selectedNodeId);
+    if (nodeStateIt == _nodeStates.cend()) {
+        Q_EMIT selectedNodeValidationChanged(QString(), QString(), QString());
+        return;
+    }
+
+    const ValidationResult result = validationResultFor(_selectedNodeId, nodeStateIt->typeKey, nodeStateIt->properties);
+    Q_EMIT selectedNodeValidationChanged(nodeValidationState(_selectedNodeId), nodeValidationMessage(_selectedNodeId), result.propertyKey);
 }
 
 bool QtNodesEditorWidget::acceptNodeDrag(QMimeData const *mimeData,
@@ -1447,6 +1660,7 @@ void QtNodesEditorWidget::showCanvasContextMenu(QPoint const &globalPos)
         menu.addSeparator();
 
     QAction *selectAllAction = menu.addAction(tr("Select All"));
+    selectAllAction->setEnabled(hasNodes());
     connect(selectAllAction, &QAction::triggered, this, &QtNodesEditorWidget::selectAllNodes);
 
     menu.exec(globalPos);

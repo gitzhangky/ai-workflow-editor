@@ -1,7 +1,11 @@
 #pragma once
 
+#include "inspector/InspectorFieldSchema.hpp"
+
 #include <QVariant>
 #include <QWidget>
+
+#include <vector>
 
 class QDoubleSpinBox;
 class QEvent;
@@ -19,7 +23,7 @@ public:
     explicit InspectorPanel(QWidget *parent = nullptr);
 
     void clearSelection();
-    void setValidationFeedback(QString const &state, QString const &message);
+    void setValidationFeedback(QString const &state, QString const &message, QString const &propertyKey = QString());
     void setSelectedNode(QString const &typeKey,
                          QString const &displayName,
                          QString const &description,
@@ -34,6 +38,21 @@ Q_SIGNALS:
     void propertyEdited(QString const &propertyKey, QVariant const &value);
 
 private:
+    struct PropertyFieldBinding
+    {
+        InspectorFieldSchema schema;
+        QLabel *label;
+        QWidget *widget;
+    };
+
+    void initializePropertyFieldBindings();
+    void connectPropertyFieldSignals();
+    void clearPropertyFieldValues();
+    void applyPropertyFieldValues(QVariantMap const &properties);
+    void applyPropertyFieldHints();
+    void setPropertyFieldEnabledForType(QString const &typeKey);
+    void clearPropertyFieldValidationState();
+    void applyPropertyFieldValidationState(QString const &state, QString const &propertyKey, QString const &message);
     void retranslateUi();
     void updateValidationLabel();
     void setTypeSpecificSectionVisible(QString const &typeKey);
@@ -43,6 +62,7 @@ private:
 
     QString _currentTypeKey;
     QString _validationState;
+    QString _validationPropertyKey;
     QLabel *_hintLabel;
     QLabel *_typeBadgeLabel;
     QLabel *_typeSummaryLabel;
@@ -75,4 +95,5 @@ private:
     QSpinBox *_toolTimeoutSpin;
     QLabel *_toolInputMappingLabel;
     QTextEdit *_toolInputMappingEdit;
+    std::vector<PropertyFieldBinding> _propertyFields;
 };
