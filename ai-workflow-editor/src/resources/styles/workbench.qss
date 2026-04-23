@@ -42,32 +42,79 @@ QMenu::item:selected {
     color: #20344f;
 }
 
-QToolBar#primaryToolBar {
-    background: #fcfaf6;
+QToolBar#primaryToolBar,
+QToolBar#primaryToolBar[variant="workbench"] {
+    background: #fbf8f2;
     border: none;
     border-bottom: 1px solid #ddd5c9;
-    padding: 10px 18px;
-    spacing: 8px;
+    padding: 7px 16px;
+    spacing: 4px;
 }
 
-QToolBar#primaryToolBar QToolButton {
-    background: #f7f1e7;
-    border: 1px solid #d9cfbf;
-    border-radius: 10px;
-    color: #2d241f;
+QToolBar#primaryToolBar::separator,
+QToolBar#primaryToolBar[variant="workbench"]::separator {
+    background: #e3dacd;
+    margin: 7px 8px;
+    width: 1px;
+}
+
+QToolBar#primaryToolBar QToolButton,
+QToolBar#primaryToolBar[variant="workbench"] QToolButton {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: #3b332d;
     font-weight: 600;
-    min-height: 34px;
-    min-width: 56px;
-    padding: 0 14px;
+    min-height: 30px;
+    min-width: 0;
+    padding: 0 11px;
 }
 
-QToolBar#primaryToolBar QToolButton:hover {
-    background: #f1e8da;
-    border-color: #cabca7;
+QToolBar#primaryToolBar QToolButton:hover,
+QToolBar#primaryToolBar[variant="workbench"] QToolButton:hover {
+    background: #f3ede3;
+    border-color: #ddd2c1;
 }
 
-QToolBar#primaryToolBar QToolButton:pressed {
-    background: #e9decd;
+QToolBar#primaryToolBar QToolButton:pressed,
+QToolBar#primaryToolBar[variant="workbench"] QToolButton:pressed {
+    background: #ece3d5;
+    border-color: #d4c6b1;
+}
+
+QToolBar#primaryToolBar QToolButton[emphasis="primary"],
+QToolBar#primaryToolBar[variant="workbench"] QToolButton[emphasis="primary"] {
+    background: #efe6d7;
+    border-color: #d9c8aa;
+    color: #322820;
+}
+
+QToolBar#primaryToolBar QToolButton[emphasis="primary"]:hover,
+QToolBar#primaryToolBar[variant="workbench"] QToolButton[emphasis="primary"]:hover {
+    background: #e8dcc7;
+    border-color: #ccb892;
+}
+
+QToolButton#languageToolButton,
+QToolButton#languageToolButton[variant="toolbar-language"] {
+    background: #f7f1e7;
+    border: 1px solid #ddd1c0;
+    border-radius: 9px;
+    color: #564b40;
+    font-weight: 600;
+    min-width: 74px;
+    padding: 0 10px;
+}
+
+QToolButton#languageToolButton:hover,
+QToolButton#languageToolButton[variant="toolbar-language"]:hover {
+    background: #f0e8dc;
+    border-color: #d0c1ab;
+}
+
+QToolButton#languageToolButton:pressed,
+QToolButton#languageToolButton[variant="toolbar-language"]:pressed {
+    background: #e8dece;
 }
 
 QDockWidget#nodeLibraryDock,

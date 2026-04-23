@@ -101,6 +101,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _primaryToolBar->setObjectName("primaryToolBar");
     _primaryToolBar->setMovable(false);
     _primaryToolBar->setFloatable(false);
+    _primaryToolBar->setProperty("variant", QStringLiteral("workbench"));
+    _primaryToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    _primaryToolBar->setIconSize(QSize(18, 18));
 
     _newAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("new")), QString());
     _newAction->setObjectName("newAction");
@@ -108,16 +111,21 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _openAction->setObjectName("openAction");
     _saveAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("save")), QString());
     _saveAction->setObjectName("saveAction");
+    _saveAction->setProperty("emphasis", QStringLiteral("primary"));
+    _primaryToolBar->addSeparator();
     _saveAsAction = new QAction(this);
     _saveAsAction->setObjectName("saveAsAction");
-    _deleteAction = new QAction(this);
+    _deleteAction = new QAction(toolbarIcon(QStringLiteral("delete")), QString(), this);
     _deleteAction->setObjectName("deleteAction");
-    _selectAllAction = new QAction(this);
+    _selectAllAction = new QAction(toolbarIcon(QStringLiteral("select-all")), QString(), this);
     _selectAllAction->setObjectName("selectAllAction");
     _undoAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("undo")), QString());
     _undoAction->setObjectName("undoAction");
     _redoAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("redo")), QString());
     _redoAction->setObjectName("redoAction");
+    _primaryToolBar->addAction(_deleteAction);
+    _primaryToolBar->addSeparator();
+    _primaryToolBar->addAction(_selectAllAction);
     _centerAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("center")), QString());
     _centerAction->setObjectName("centerAction");
     _primaryToolBar->addSeparator();
@@ -131,6 +139,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
 
     _languageToolButton = new QToolButton(this);
     _languageToolButton->setObjectName("languageToolButton");
+    _languageToolButton->setProperty("variant", QStringLiteral("toolbar-language"));
     _languageToolButton->setIcon(toolbarIcon(QStringLiteral("language")));
     _languageToolButton->setPopupMode(QToolButton::InstantPopup);
 
@@ -144,6 +153,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _languageToolButton->setMenu(languageMenu);
     _primaryToolBar->addWidget(_languageToolButton);
     _languageMenuAction = _settingsMenu->addMenu(_languageMenu);
+    if (auto *saveButton = qobject_cast<QToolButton *>(_primaryToolBar->widgetForAction(_saveAction)); saveButton != nullptr)
+        saveButton->setProperty("emphasis", QStringLiteral("primary"));
 
     _nodeLibraryDock = new QDockWidget(this);
     _nodeLibraryDock->setObjectName("nodeLibraryDock");

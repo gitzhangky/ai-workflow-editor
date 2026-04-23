@@ -62,6 +62,8 @@ private slots:
     void createsWorkflowCanvasInCentralArea();
     void appliesLightWorkbenchCanvasBackground();
     void createsPrimaryToolbarAndStatusBar();
+    void showsGroupedToolbarLayout();
+    void exposesToolbarStylingHooks();
     void exposesStableObjectNamesForWorkbenchChrome();
     void createsMenuBarWithFileViewAndSettingsMenus();
     void defaultsWorkbenchTextToChinese();
@@ -189,11 +191,52 @@ void MainWindowTests::createsPrimaryToolbarAndStatusBar()
 
     auto *toolbar = window.findChild<QToolBar *>("primaryToolBar");
     QVERIFY(toolbar != nullptr);
-    QCOMPARE(toolbar->actions().size(), 8);
+    QCOMPARE(toolbar->actions().size(), 12);
     QCOMPARE(toolbar->actions().at(0)->text(), QString::fromUtf8("新建"));
-    QCOMPARE(toolbar->actions().at(5)->text(), QString::fromUtf8("居中"));
+    QCOMPARE(toolbar->actions().at(2)->text(), QString::fromUtf8("保存"));
 
     QVERIFY(window.statusBar() != nullptr);
+}
+
+void MainWindowTests::showsGroupedToolbarLayout()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *toolbar = window.findChild<QToolBar *>("primaryToolBar");
+    QVERIFY(toolbar != nullptr);
+
+    const auto actions = toolbar->actions();
+    QCOMPARE(actions.size(), 12);
+    QCOMPARE(actions.at(0)->objectName(), QString("newAction"));
+    QCOMPARE(actions.at(1)->objectName(), QString("openAction"));
+    QCOMPARE(actions.at(2)->objectName(), QString("saveAction"));
+    QVERIFY(actions.at(3)->isSeparator());
+    QCOMPARE(actions.at(4)->objectName(), QString("undoAction"));
+    QCOMPARE(actions.at(5)->objectName(), QString("redoAction"));
+    QCOMPARE(actions.at(6)->objectName(), QString("deleteAction"));
+    QVERIFY(actions.at(7)->isSeparator());
+    QCOMPARE(actions.at(8)->objectName(), QString("selectAllAction"));
+    QCOMPARE(actions.at(9)->objectName(), QString("centerAction"));
+    QVERIFY(actions.at(10)->isSeparator());
+    QVERIFY(actions.at(11)->isSeparator() == false);
+}
+
+void MainWindowTests::exposesToolbarStylingHooks()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *toolbar = window.findChild<QToolBar *>("primaryToolBar");
+    auto *saveAction = window.findChild<QAction *>("saveAction");
+    auto *languageButton = window.findChild<QToolButton *>("languageToolButton");
+    QVERIFY(toolbar != nullptr);
+    QVERIFY(saveAction != nullptr);
+    QVERIFY(languageButton != nullptr);
+
+    QCOMPARE(toolbar->property("variant").toString(), QString("workbench"));
+    QCOMPARE(saveAction->property("emphasis").toString(), QString("primary"));
+    QCOMPARE(languageButton->property("variant").toString(), QString("toolbar-language"));
 }
 
 void MainWindowTests::exposesStableObjectNamesForWorkbenchChrome()
