@@ -60,8 +60,8 @@ Target names for selective builds:
 - **`build/` directories are generated artifacts.** Never read, search, or commit them.
 - **`QVariantMap` for node properties** — intentional at this stage; don't replace with a typed
   schema engine unless the plan explicitly calls for it.
-- **Qt 5.15 on macOS** is the primary development environment. The code should also be
-  compatible with Qt 6 and Windows, but CI is not set up yet.
+- **Qt 5.15 on macOS** is the primary development environment. CI tests Linux, Windows,
+  and macOS with both Qt 5.15 and Qt 6.5.
 
 ## Architecture Quick Reference
 
@@ -116,6 +116,10 @@ InspectorPanel (user edits a field)
 - [x] **Node-level validation** — inline badges, border color changes, inspector field highlighting
 - [x] **Inspector field schema** — data-driven property field definitions via InspectorFieldSchema
 - [x] **Expanded node set** — agent, memory, retriever, templateVariables, httpRequest, jsonTransform, chatOutput with SVG icons
+- [x] **Zoom indicator** — real-time zoom percentage in status bar
+- [x] **Port count badges** — input→output port counts on library entries
+- [x] **No-results empty state** — message when library search has no matches
+- [x] **Cross-platform CI** — GitHub Actions for Linux/Windows/macOS with Qt 5.15 and Qt 6.5
 
 ## What To Build Next
 
@@ -128,8 +132,8 @@ immediate task sequence (items 1–6 are done):
 4. ~~delete selected node and connection~~ ✅
 5. ~~validation markers~~ ✅
 6. ~~expand built-in node set~~ ✅
-7. **canvas and library polish** ← START HERE
-8. Windows CI
+7. ~~canvas and library polish~~ ✅
+8. ~~cross-platform CI~~ ✅
 
 ## Rules For Agents
 

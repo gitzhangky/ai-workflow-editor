@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            qt-version: "5.15.2"
+            name: "Linux Qt 5.15"
+          - os: ubuntu-latest
+            qt-version: "6.5.3"
+            name: "Linux Qt 6.5"
+          - os: windows-latest
+            qt-version: "5.15.2"
+            name: "Windows Qt 5.15"
+          - os: windows-latest
+            qt-version: "6.5.3"
+            name: "Windows Qt 6.5"
+          - os: macos-latest
+            qt-version: "5.15.2"
+            name: "macOS Qt 5.15"
+          - os: macos-latest
+            qt-version: "6.5.3"
+            name: "macOS Qt 6.5"
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt-version }}
+
+      - name: Install Linux display server
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxkbcommon-x11-0 libxcb-xinerama0 libxcb-cursor0
+
+      - name: Configure
+        run: cmake -S ai-workflow-editor -B ai-workflow-editor/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build ai-workflow-editor/build --config Release
+
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run ctest --test-dir ai-workflow-editor/build --output-on-failure -C Release
+
+      - name: Test (non-Linux)
+        if: runner.os != 'Linux'
+        run: ctest --test-dir ai-workflow-editor/build --output-on-failure -C Release
+
+  build-no-tests:
+    name: "Build without tests (Linux Qt 6.5)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.5.3"
+          modules: qtsvg
+
+      - name: Configure (tests disabled)
+        run: cmake -S ai-workflow-editor -B ai-workflow-editor/build -DCMAKE_BUILD_TYPE=Release -DAI_WORKFLOW_EDITOR_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build ai-workflow-editor/build --config Release

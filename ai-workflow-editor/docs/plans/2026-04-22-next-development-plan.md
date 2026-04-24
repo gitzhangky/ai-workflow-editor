@@ -241,8 +241,8 @@ Use this exact order:
 4. ~~delete selected node and connection~~ ✅ completed 2026-04-22
 5. ~~validation markers~~ ✅ completed 2026-04-24
 6. ~~expand built-in node set~~ ✅ completed 2026-04-24
-7. canvas and library polish ← **START HERE**
-8. Windows CI
+7. ~~canvas and library polish~~ ✅ completed 2026-04-24
+8. ~~cross-platform CI~~ ✅ completed 2026-04-24
 
 ## Stop Conditions
 
