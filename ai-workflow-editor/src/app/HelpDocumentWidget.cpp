@@ -1,6 +1,11 @@
 #include "app/HelpDocumentWidget.hpp"
 
+#include <QImage>
+#include <QPainter>
+#include <QPainterPath>
 #include <QTextBrowser>
+#include <QTextDocument>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace
@@ -43,6 +48,200 @@ QString wrap(QString const &body)
 {
     return QStringLiteral("<html><head><style>%1</style></head><body>%2</body></html>").arg(helpCss(), body);
 }
+
+void drawRoundedBox(QPainter &painter,
+                    QRectF const &rect,
+                    QString const &text,
+                    QColor const &fill,
+                    QColor const &stroke,
+                    QColor const &textColor = QColor(QStringLiteral("#4c433b")))
+{
+    QPainterPath path;
+    path.addRoundedRect(rect, 12.0, 12.0);
+    painter.fillPath(path, fill);
+    painter.setPen(QPen(stroke, 2.0));
+    painter.drawPath(path);
+    painter.setPen(textColor);
+    painter.drawText(rect.adjusted(10, 8, -10, -8), Qt::AlignCenter | Qt::TextWordWrap, text);
+}
+
+QImage makeLayoutOverviewImage(bool chinese)
+{
+    QImage image(860, 430, QImage::Format_ARGB32_Premultiplied);
+    image.fill(QColor(QStringLiteral("#fffdf9")));
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QFont titleFont = painter.font();
+    titleFont.setPointSize(17);
+    titleFont.setBold(true);
+    painter.setFont(titleFont);
+    painter.setPen(QColor(QStringLiteral("#4c433b")));
+    painter.drawText(QRectF(24, 18, 812, 36),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     chinese ? QString::fromUtf8("界面布局图") : QStringLiteral("Interface Layout"));
+
+    QFont bodyFont = painter.font();
+    bodyFont.setPointSize(12);
+    bodyFont.setBold(true);
+    painter.setFont(bodyFont);
+
+    drawRoundedBox(painter,
+                   QRectF(30, 70, 800, 54),
+                   chinese ? QString::fromUtf8("顶部工具栏和菜单\n新建 / 保存 / 撤销 / 导出 / 帮助")
+                           : QStringLiteral("Toolbar and menus\nNew / Save / Undo / Export / Help"),
+                   QColor(QStringLiteral("#edf3fb")),
+                   QColor(QStringLiteral("#b8cbe8")));
+    drawRoundedBox(painter,
+                   QRectF(30, 146, 190, 160),
+                   chinese ? QString::fromUtf8("左侧节点库\n搜索、分组、拖拽节点")
+                           : QStringLiteral("Node Library\nSearch, categories,\ndrag nodes"),
+                   QColor(QStringLiteral("#f2eadf")),
+                   QColor(QStringLiteral("#d8cfbf")));
+    drawRoundedBox(painter,
+                   QRectF(244, 146, 372, 160),
+                   chinese ? QString::fromUtf8("中间工作流画布\n摆放节点并连接端口\n帮助页也在这里打开为新页签")
+                           : QStringLiteral("Workflow Canvas\nPlace nodes and connect ports\nHelp opens here as a tab"),
+                   QColor(QStringLiteral("#fff6e7")),
+                   QColor(QStringLiteral("#d8c7ac")));
+    drawRoundedBox(painter,
+                   QRectF(640, 146, 190, 160),
+                   chinese ? QString::fromUtf8("右侧 Inspector\n编辑属性并查看校验提示")
+                           : QStringLiteral("Inspector\nEdit properties and\nvalidation hints"),
+                   QColor(QStringLiteral("#f2eadf")),
+                   QColor(QStringLiteral("#d8cfbf")));
+    drawRoundedBox(painter,
+                   QRectF(30, 330, 800, 54),
+                   chinese ? QString::fromUtf8("底部状态栏\n校验摘要 / 连线反馈 / 缩放比例")
+                           : QStringLiteral("Status bar\nValidation summary / connection feedback / zoom"),
+                   QColor(QStringLiteral("#edf3fb")),
+                   QColor(QStringLiteral("#b8cbe8")));
+
+    return image;
+}
+
+QImage makeMinimalWorkflowImage(bool chinese)
+{
+    QImage image(860, 260, QImage::Format_ARGB32_Premultiplied);
+    image.fill(QColor(QStringLiteral("#fffdf9")));
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QFont titleFont = painter.font();
+    titleFont.setPointSize(17);
+    titleFont.setBold(true);
+    painter.setFont(titleFont);
+    painter.setPen(QColor(QStringLiteral("#4c433b")));
+    painter.drawText(QRectF(24, 16, 812, 34),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     chinese ? QString::fromUtf8("最小工作流") : QStringLiteral("Minimal Workflow"));
+
+    QFont nodeFont = painter.font();
+    nodeFont.setPointSize(12);
+    nodeFont.setBold(true);
+    painter.setFont(nodeFont);
+
+    const QStringList labels = chinese
+                                   ? QStringList{QString::fromUtf8("开始"), QString::fromUtf8("提示词"),
+                                                 QString::fromUtf8("大模型"), QString::fromUtf8("输出")}
+                                   : QStringList{QStringLiteral("Start"), QStringLiteral("Prompt"),
+                                                 QStringLiteral("LLM"), QStringLiteral("Output")};
+
+    QVector<QRectF> rects;
+    rects << QRectF(60, 104, 140, 70) << QRectF(260, 104, 140, 70) << QRectF(460, 104, 140, 70)
+          << QRectF(660, 104, 140, 70);
+
+    for (int i = 0; i < rects.size(); ++i) {
+        drawRoundedBox(painter,
+                       rects.at(i),
+                       labels.at(i),
+                       QColor(QStringLiteral("#f7f1e7")),
+                       QColor(QStringLiteral("#d8c7ac")));
+
+        if (i + 1 < rects.size()) {
+            const QPointF start(rects.at(i).right() + 16, rects.at(i).center().y());
+            const QPointF end(rects.at(i + 1).left() - 16, rects.at(i + 1).center().y());
+            painter.setPen(QPen(QColor(QStringLiteral("#4b84d9")), 3.0, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(start, end);
+            QPolygonF arrow;
+            arrow << QPointF(end.x(), end.y()) << QPointF(end.x() - 10, end.y() - 6)
+                  << QPointF(end.x() - 10, end.y() + 6);
+            painter.setBrush(QColor(QStringLiteral("#4b84d9")));
+            painter.drawPolygon(arrow);
+        }
+    }
+
+    painter.setPen(QColor(QStringLiteral("#7b6b5a")));
+    QFont captionFont = painter.font();
+    captionFont.setPointSize(11);
+    captionFont.setBold(false);
+    painter.setFont(captionFont);
+    painter.drawText(QRectF(60, 198, 740, 32),
+                     Qt::AlignCenter,
+                     chinese ? QString::fromUtf8("开始 → 提示词 → 大模型 → 输出")
+                             : QStringLiteral("Start → Prompt → LLM → Output"));
+
+    return image;
+}
+
+QImage makeValidationCardImage(bool chinese)
+{
+    QImage image(860, 310, QImage::Format_ARGB32_Premultiplied);
+    image.fill(QColor(QStringLiteral("#fffdf9")));
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QFont titleFont = painter.font();
+    titleFont.setPointSize(17);
+    titleFont.setBold(true);
+    painter.setFont(titleFont);
+    painter.setPen(QColor(QStringLiteral("#4c433b")));
+    painter.drawText(QRectF(24, 16, 812, 34),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     chinese ? QString::fromUtf8("校验提示如何读") : QStringLiteral("Reading Validation Feedback"));
+
+    drawRoundedBox(painter,
+                   QRectF(72, 78, 250, 150),
+                   chinese ? QString::fromUtf8("提示词\n用户提示模板：空\nwarning")
+                           : QStringLiteral("Prompt\nUser template: empty\nwarning"),
+                   QColor(QStringLiteral("#fff6e7")),
+                   QColor(QStringLiteral("#d8c7ac")));
+
+    drawRoundedBox(painter,
+                   QRectF(372, 78, 210, 64),
+                   chinese ? QString::fromUtf8("Inspector\n高亮问题字段")
+                           : QStringLiteral("Inspector\nHighlights field"),
+                   QColor(QStringLiteral("#eef6e8")),
+                   QColor(QStringLiteral("#8cb878")));
+
+    drawRoundedBox(painter,
+                   QRectF(372, 164, 360, 64),
+                   chinese ? QString::fromUtf8("状态栏\n当前选中节点的校验摘要")
+                           : QStringLiteral("Status Bar\nValidation summary for selection"),
+                   QColor(QStringLiteral("#edf3fb")),
+                   QColor(QStringLiteral("#b8cbe8")));
+
+    painter.setPen(QPen(QColor(QStringLiteral("#4b84d9")), 3.0, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(QPointF(322, 124), QPointF(368, 110));
+    painter.drawLine(QPointF(322, 158), QPointF(368, 196));
+
+    painter.setPen(QColor(QStringLiteral("#9b6a20")));
+    QFont badgeFont = painter.font();
+    badgeFont.setPointSize(12);
+    badgeFont.setBold(true);
+    painter.setFont(badgeFont);
+    drawRoundedBox(painter,
+                   QRectF(92, 238, 132, 38),
+                   chinese ? QString::fromUtf8("warning") : QStringLiteral("warning"),
+                   QColor(QStringLiteral("#fff1d6")),
+                   QColor(QStringLiteral("#d69545")),
+                   QColor(QStringLiteral("#9b6a20")));
+
+    return image;
+}
 }
 
 HelpDocumentWidget::HelpDocumentWidget(QWidget *parent)
@@ -64,7 +263,22 @@ HelpDocumentWidget::HelpDocumentWidget(QWidget *parent)
 
 void HelpDocumentWidget::retranslateUi()
 {
+    const bool chinese = tr("Overview") != QStringLiteral("Overview");
+    registerIllustrationResources(chinese);
     _browser->setHtml(buildHelpContent());
+}
+
+void HelpDocumentWidget::registerIllustrationResources(bool chinese)
+{
+    _browser->document()->addResource(QTextDocument::ImageResource,
+                                      QUrl(QStringLiteral("help://layout-overview")),
+                                      makeLayoutOverviewImage(chinese));
+    _browser->document()->addResource(QTextDocument::ImageResource,
+                                      QUrl(QStringLiteral("help://minimal-workflow")),
+                                      makeMinimalWorkflowImage(chinese));
+    _browser->document()->addResource(QTextDocument::ImageResource,
+                                      QUrl(QStringLiteral("help://validation-card")),
+                                      makeValidationCardImage(chinese));
 }
 
 QString HelpDocumentWidget::buildHelpContent() const
@@ -81,13 +295,10 @@ QString HelpDocumentWidget::buildHelpContent() const
 
         html += QStringLiteral("<h2>Illustrated Tour</h2>");
         html += QStringLiteral(
-            "<div class='help-figure layout-diagram'>"
-            "<div class='diagram-box diagram-wide'>Toolbar and menus: file, edit, view, export, help</div>"
-            "<div class='diagram-box'>Node Library<br/>search, categories, drag nodes</div>"
-            "<div class='diagram-box'>Workflow Canvas<br/>place nodes and connect ports</div>"
-            "<div class='diagram-box'>Inspector<br/>edit node properties and validation hints</div>"
-            "<div class='diagram-box diagram-wide'>Status bar: validation summary, connection feedback, zoom</div>"
-            "<div class='caption'>The canvas is the first tab in the central workspace. The user guide opens as another tab.</div>"
+            "<div class='help-figure'>"
+            "<img src='help://layout-overview' width='720'/>"
+            "<div class='caption'>Toolbar and menus, Node Library, Workflow Canvas, Inspector, and Status Bar. "
+            "The canvas is the first tab in the central workspace. The user guide opens as another tab.</div>"
             "</div>");
 
         html += QStringLiteral("<h2>5-Minute Route</h2>");
@@ -100,11 +311,8 @@ QString HelpDocumentWidget::buildHelpContent() const
             "<li>Save the workflow, reopen it, then try exporting Python code.</li>"
             "</ol>");
         html += QStringLiteral(
-            "<div class='help-figure workflow-diagram'>"
-            "<span class='flow-node'>Start</span><span class='flow-arrow'>→</span>"
-            "<span class='flow-node'>Prompt</span><span class='flow-arrow'>→</span>"
-            "<span class='flow-node'>LLM</span><span class='flow-arrow'>→</span>"
-            "<span class='flow-node'>Output</span>"
+            "<div class='help-figure'>"
+            "<img src='help://minimal-workflow' width='720'/>"
             "<div class='caption'>Minimal workflow: Start → Prompt → LLM → Output.</div>"
             "</div>");
 
@@ -118,10 +326,9 @@ QString HelpDocumentWidget::buildHelpContent() const
             "</ul>");
         html += QStringLiteral(
             "<div class='help-figure'>"
-            "<div class='node-card-demo'><div class='node-card-head'>Prompt</div>"
-            "<div class='node-card-body'>User template: empty<br/><span class='badge warn'>warning</span>"
-            "<span class='badge ok'>connected</span></div></div>"
-            "<div class='caption'>Node cards, Inspector messages, and the status bar all reflect the same validation state.</div>"
+            "<img src='help://validation-card' width='720'/>"
+            "<div class='caption'>Example: Prompt, User template: empty, warning. "
+            "Node cards, Inspector messages, and the status bar all reflect the same validation state.</div>"
             "</div>");
 
         html += QStringLiteral("<h2>Node Types</h2>");
@@ -178,13 +385,10 @@ QString HelpDocumentWidget::buildHelpContent() const
 
     html += QStringLiteral("<h2>图文导览</h2>");
     html += QStringLiteral(
-        "<div class='help-figure layout-diagram'>"
-        "<div class='diagram-box diagram-wide'>顶部工具栏和菜单：文件、编辑、视图、导出、帮助</div>"
-        "<div class='diagram-box'>左侧节点库<br/>搜索、分组、拖拽节点</div>"
-        "<div class='diagram-box'>中间工作流画布<br/>摆放节点并连接端口</div>"
-        "<div class='diagram-box'>右侧 Inspector<br/>编辑节点属性和查看校验提示</div>"
-        "<div class='diagram-box diagram-wide'>底部状态栏：校验摘要、连线反馈、缩放比例</div>"
-        "<div class='caption'>画布是中央工作区的第一个页签；用户指南会作为另一个页签打开。</div>"
+        "<div class='help-figure'>"
+        "<img src='help://layout-overview' width='720'/>"
+        "<div class='caption'>顶部工具栏和菜单、左侧节点库、中间工作流画布、右侧 Inspector、底部状态栏。"
+        "画布是中央工作区的第一个页签；用户指南会作为另一个页签打开。</div>"
         "</div>");
 
     html += QStringLiteral("<h2>5 分钟路线</h2>");
@@ -197,11 +401,8 @@ QString HelpDocumentWidget::buildHelpContent() const
         "<li>保存工作流，重新打开，再尝试导出 Python 代码。</li>"
         "</ol>");
     html += QStringLiteral(
-        "<div class='help-figure workflow-diagram'>"
-        "<span class='flow-node'>开始</span><span class='flow-arrow'>→</span>"
-        "<span class='flow-node'>提示词</span><span class='flow-arrow'>→</span>"
-        "<span class='flow-node'>大模型</span><span class='flow-arrow'>→</span>"
-        "<span class='flow-node'>输出</span>"
+        "<div class='help-figure'>"
+        "<img src='help://minimal-workflow' width='720'/>"
         "<div class='caption'>最小工作流：开始 → 提示词 → 大模型 → 输出。</div>"
         "</div>");
 
@@ -215,10 +416,9 @@ QString HelpDocumentWidget::buildHelpContent() const
         "</ul>");
     html += QStringLiteral(
         "<div class='help-figure'>"
-        "<div class='node-card-demo'><div class='node-card-head'>提示词</div>"
-        "<div class='node-card-body'>用户提示模板：空<br/><span class='badge warn'>warning</span>"
-        "<span class='badge ok'>已连接</span></div></div>"
-        "<div class='caption'>节点卡片、Inspector 和状态栏会显示同一套校验状态。</div>"
+        "<img src='help://validation-card' width='720'/>"
+        "<div class='caption'>示例：提示词，用户提示模板：空，warning。"
+        "节点卡片、Inspector 和状态栏会显示同一套校验状态。</div>"
         "</div>");
 
     html += QStringLiteral("<h2>节点类型</h2>");

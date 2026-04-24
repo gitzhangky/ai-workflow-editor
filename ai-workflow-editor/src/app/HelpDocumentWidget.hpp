@@ -15,6 +15,7 @@ public:
 
 private:
     QString buildHelpContent() const;
+    void registerIllustrationResources(bool chinese);
 
     QTextBrowser *_browser;
 };

@@ -31,6 +31,8 @@
 #include <QTabWidget>
 #include <QTextEdit>
 #include <QTextBrowser>
+#include <QTextDocument>
+#include <QUrl>
 #include <QToolButton>
 #include <QToolBar>
 #include <QDragEnterEvent>
@@ -316,6 +318,19 @@ void MainWindowTests::userGuideCoversCoreWorkflowTasksWithVisualDiagrams()
     QVERIFY(plainText.contains(QString::fromUtf8("左侧节点库")));
     QVERIFY(plainText.contains(QString::fromUtf8("最小工作流")));
     QVERIFY(plainText.contains(QString::fromUtf8("用户提示模板：空")));
+
+    const QVariant layoutImage =
+        browser->document()->resource(QTextDocument::ImageResource, QUrl("help://layout-overview"));
+    const QVariant workflowImage =
+        browser->document()->resource(QTextDocument::ImageResource, QUrl("help://minimal-workflow"));
+    const QVariant validationImage =
+        browser->document()->resource(QTextDocument::ImageResource, QUrl("help://validation-card"));
+    QVERIFY(layoutImage.canConvert<QImage>());
+    QVERIFY(workflowImage.canConvert<QImage>());
+    QVERIFY(validationImage.canConvert<QImage>());
+    QVERIFY(!layoutImage.value<QImage>().isNull());
+    QVERIFY(!workflowImage.value<QImage>().isNull());
+    QVERIFY(!validationImage.value<QImage>().isNull());
 }
 
 void MainWindowTests::preservesDockVisibilityPreferenceWhenSwitchingHelpTab()
