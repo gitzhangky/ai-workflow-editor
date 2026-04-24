@@ -68,6 +68,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _openAction(nullptr)
     , _saveAction(nullptr)
     , _saveAsAction(nullptr)
+    , _copyAction(nullptr)
+    , _pasteAction(nullptr)
+    , _duplicateAction(nullptr)
     , _deleteAction(nullptr)
     , _selectAllAction(nullptr)
     , _undoAction(nullptr)
@@ -115,6 +118,12 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _primaryToolBar->addSeparator();
     _saveAsAction = new QAction(this);
     _saveAsAction->setObjectName("saveAsAction");
+    _copyAction = new QAction(this);
+    _copyAction->setObjectName("copyAction");
+    _pasteAction = new QAction(this);
+    _pasteAction->setObjectName("pasteAction");
+    _duplicateAction = new QAction(this);
+    _duplicateAction->setObjectName("duplicateAction");
     _deleteAction = new QAction(toolbarIcon(QStringLiteral("delete")), QString(), this);
     _deleteAction->setObjectName("deleteAction");
     _selectAllAction = new QAction(toolbarIcon(QStringLiteral("select-all")), QString(), this);
@@ -313,6 +322,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             saveWorkflowToPath(filePath);
     });
 
+    connect(_copyAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::copySelection);
+    connect(_pasteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::pasteClipboard);
+    connect(_duplicateAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::duplicateSelection);
     connect(_deleteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::deleteSelection);
     connect(_selectAllAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::selectAllNodes);
     connect(_undoAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::undo);
@@ -406,6 +418,9 @@ void MainWindow::updateWorkbenchActionStates()
 
     _undoAction->setEnabled(_editorWidget->canUndo());
     _redoAction->setEnabled(_editorWidget->canRedo());
+    _copyAction->setEnabled(_editorWidget->hasSelection());
+    _duplicateAction->setEnabled(_editorWidget->hasSelection());
+    _pasteAction->setEnabled(_editorWidget->canPaste());
     _deleteAction->setEnabled(_editorWidget->hasSelection());
     _selectAllAction->setEnabled(_editorWidget->hasNodes());
     _centerAction->setEnabled(_editorWidget->hasNodes());
@@ -469,12 +484,18 @@ void MainWindow::retranslateUi()
     _saveAction->setText(tr("Save"));
     _saveAsAction->setText(tr("Save As..."));
     _recentFilesMenu->setTitle(tr("Recent Files"));
+    _copyAction->setText(tr("Copy"));
+    _pasteAction->setText(tr("Paste"));
+    _duplicateAction->setText(tr("Duplicate"));
     _deleteAction->setText(tr("Delete"));
     _selectAllAction->setText(tr("Select All"));
     _newAction->setShortcut(QKeySequence::keyBindings(QKeySequence::New).constFirst());
     _openAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Open).constFirst());
     _saveAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Save).constFirst());
     _saveAsAction->setShortcut(QKeySequence::keyBindings(QKeySequence::SaveAs).constFirst());
+    _copyAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Copy).constFirst());
+    _pasteAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Paste).constFirst());
+    _duplicateAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
     _deleteAction->setShortcut(QKeySequence(Qt::Key_Delete));
     _selectAllAction->setShortcut(QKeySequence::keyBindings(QKeySequence::SelectAll).constFirst());
     _undoAction->setText(tr("Undo"));
@@ -511,6 +532,10 @@ void MainWindow::retranslateUi()
     _editMenu->clear();
     _editMenu->addAction(_undoAction);
     _editMenu->addAction(_redoAction);
+    _editMenu->addSeparator();
+    _editMenu->addAction(_copyAction);
+    _editMenu->addAction(_pasteAction);
+    _editMenu->addAction(_duplicateAction);
     _editMenu->addSeparator();
     _editMenu->addAction(_selectAllAction);
     _editMenu->addAction(_deleteAction);

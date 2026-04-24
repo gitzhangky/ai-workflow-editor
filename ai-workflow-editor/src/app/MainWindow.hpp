@@ -72,6 +72,9 @@ private:
     QAction *_openAction;
     QAction *_saveAction;
     QAction *_saveAsAction;
+    QAction *_copyAction;
+    QAction *_pasteAction;
+    QAction *_duplicateAction;
     QAction *_deleteAction;
     QAction *_selectAllAction;
     QAction *_undoAction;

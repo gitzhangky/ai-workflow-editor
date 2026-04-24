@@ -62,249 +62,58 @@ That is why the next wave should prioritize reliability, validation clarity, and
 
 Use this sequence for the next wave.
 
-### Phase A: Validation Engine Consolidation
+### ~~Phase A: Validation Engine Consolidation~~ ✅ completed 2026-04-24
 
-**Objective**
+Centralized validation rule path per node type, unified across inspector, node card, and status bar. All 13 node types have validation rules. Field-level validation highlighting in inspector.
 
-Turn today’s scattered validation behavior into a more explicit, reusable workflow validation layer so node cards, inspector, and status bar all report from the same source of truth.
+### ~~Phase B: Document Semantics And Save/Undo Reliability~~ ✅ partially completed 2026-04-24
 
-**Why it goes first**
+Undo commands extracted to `UndoCommands.hpp/.cpp`. File format versioning added (v2). Dirty/clean behavior stable. Full WorkflowDocument abstraction deferred — QtNodesEditorWidget still at ~1711 lines (down from 2005) which is manageable for now.
 
-- It directly improves authoring trust.
-- It reduces UI-specific special cases before more node types multiply the problem.
-- It is the highest product-value step that still fits the current architecture.
+### ~~Phase C: Editing Reliability Completion~~ ✅ completed 2026-04-24
 
-**Scope**
+All core structural edits (create, delete, connect, disconnect, property edit) participate in undo/redo. Copy/paste/duplicate added (Ctrl+C/V/D). Context menu has copy/paste/duplicate/delete entries. Action states are fully synced with editor state.
 
-- define a clearer validation rule path per node type
-- centralize validation result creation
-- ensure node card, inspector, and status bar consume the same validation result
-- expose clearer invalid-reason messages for missing required properties and illegal structural states
-- cover validation on:
-  - prompt
-  - llm
-  - tool
-  - flow-only nodes with structural requirements if applicable
+### ~~Phase D: Inspector Maintainability And Schema Preparation~~ ✅ completed 2026-04-24
 
-**Likely files**
+InspectorFieldSchema extracted — data-driven field and section definitions. Adding a new node type's inspector fields is now schema-driven rather than manual widget wiring. Field-level validation highlighting supported.
 
-- `src/qtnodes/QtNodesEditorWidget.cpp`
-- `src/qtnodes/QtNodesEditorWidget.hpp`
-- `src/inspector/InspectorPanel.cpp`
-- `src/qtnodes/StyledNodePainter.cpp`
-- `src/registry/BuiltInNodeRegistry.cpp`
-- `tests/app/MainWindowTests.cpp`
+### ~~Phase E: Node Language Expansion~~ ✅ completed 2026-04-24
 
-**Acceptance criteria**
+All 7 new node types implemented: memory, retriever, templateVariables, httpRequest, jsonTransform, agent, chatOutput. Each has definition, ports with data type IDs, default properties, SVG icon, inspector support, persistence, validation rules, and tests.
 
-- every visible validation message comes from one consistent rule path
-- the same invalid state produces the same message in inspector, card, and status bar
-- validation updates immediately after property edit, selection change, undo, redo, save/load restore
+### ~~Phase F: Cross-Platform Hardening~~ ✅ completed 2026-04-24
 
-### Phase B: Document Semantics And Save/Undo Reliability
-
-**Objective**
-
-Strengthen the meaning of “document state” so save/load/new/reopen/undo/redo all behave predictably and are easier to evolve.
-
-**Why it goes second**
-
-- validation improvements will expose more document-state edge cases
-- the current adapter-layer document logic is already dense
-- this phase reduces risk before adding search/filter, more node types, or more complex editing commands
-
-**Scope**
-
-- introduce a focused `WorkflowDocument` or equivalent narrow abstraction if file growth justifies it
-- separate document concerns from pure scene/view concerns
-- make save/load/reset/current-path/current-clean-state semantics more explicit
-- verify command stack behavior around:
-  - new document
-  - load document
-  - save after undo/redo
-  - delete/restore after save point
-
-**Likely files**
-
-- `src/app/MainWindow.cpp`
-- `src/app/MainWindow.hpp`
-- `src/qtnodes/QtNodesEditorWidget.cpp`
-- `src/qtnodes/QtNodesEditorWidget.hpp`
-- maybe new:
-  - `src/app/WorkflowDocument.hpp`
-  - `src/app/WorkflowDocument.cpp`
-- `tests/app/MainWindowTests.cpp`
-
-**Acceptance criteria**
-
-- dirty/clean behavior remains stable across all supported editing actions
-- document lifecycle logic becomes easier to reason about than today’s widget-centric flow
-- no regression in save/load/undo/redo tests
-
-### Phase C: Editing Reliability Completion
-
-**Objective**
-
-Close the remaining editing gaps so command behavior feels complete and trustworthy.
-
-**Why it goes third**
-
-- after Phase B, command-related work will be safer
-- this finishes the “can users confidently edit workflows?” story before expanding node coverage
-
-**Scope**
-
-- bring connection creation into the same undo/redo story if still missing
-- verify mixed selection behavior and action enablement states
-- make delete/select/center/undo/redo actions reflect actual availability
-- tighten context menu logic so options match scene state
-- add regression tests for:
-  - create connection → undo → redo
-  - mixed selection precedence
-  - empty-selection command behavior
-
-**Likely files**
-
-- `src/app/MainWindow.cpp`
-- `src/qtnodes/QtNodesEditorWidget.cpp`
-- `src/qtnodes/QtNodesEditorWidget.hpp`
-- `tests/app/MainWindowTests.cpp`
-
-**Acceptance criteria**
-
-- all core structural edits participate in undo/redo consistently
-- toolbar/menu/context actions feel state-aware rather than always-on
-- no surprising no-op or destructive edge cases in selection handling
-
-### Phase D: Inspector Maintainability And Schema Preparation
-
-**Objective**
-
-Prepare the editor for more node types without letting inspector code become repetitive and brittle.
-
-**Why it goes fourth**
-
-- expanding nodes before this would cause avoidable duplication
-- validation and document semantics will already be clearer by this point
-
-**Scope**
-
-- extract repeated field wiring patterns
-- define a lightweight property schema or field descriptor layer
-- keep `QVariantMap` storage for now, but stop hardcoding every widget path in one place
-- ensure validation hints can be attached at the field level where useful
-
-**Likely files**
-
-- `src/inspector/InspectorPanel.cpp`
-- `src/inspector/InspectorPanel.hpp`
-- maybe new:
-  - `src/inspector/InspectorFieldSchema.hpp`
-  - `src/inspector/InspectorFieldSchema.cpp`
-- `tests/app/MainWindowTests.cpp`
-
-**Acceptance criteria**
-
-- adding one new property field no longer requires copy-pasting a large amount of boilerplate
-- validation feedback can point to specific field-level requirements
-- the inspector remains easy to retranslate
-
-### Phase E: Node Language Expansion (After Reliability)
-
-**Objective**
-
-Only after the editor is trustworthy, expand the built-in workflow vocabulary.
-
-**Recommended order inside this phase**
-
-1. `memory`
-2. `retriever`
-3. `template variables`
-4. `http request`
-5. `json transform`
-6. `agent`
-7. `chat output`
-
-**Why this order**
-
-- `memory` and `retriever` fit the current AI workflow framing most directly
-- `template variables` improves practical authoring without requiring runtime execution
-- `http request` and `json transform` increase orchestration value
-- `agent` should come later so it lands in a more disciplined schema/validation setup
-
-**Acceptance criteria**
-
-- every new node ships with:
-  - definition
-  - ports
-  - default properties
-  - icon
-  - inspector support
-  - persistence coverage
-  - validation rules
-
-### Phase F: Cross-Platform Hardening
-
-**Objective**
-
-Make the project continuously safer to evolve.
-
-**Scope**
-
-- update docs to reflect current implemented reality
-- add Windows CI
-- test a Qt 5.x line close to 5.13.2
-- document runtime/build prerequisites clearly
-
-**Acceptance criteria**
-
-- repository docs no longer misstate completed work
-- CI verifies at least one non-macOS environment
-- platform regressions become visible earlier than manual testing
+GitHub Actions CI matrix covers Linux/Windows/macOS × Qt 5.15/6.5. Separate build-no-tests job. Docs updated.
 
 ---
 
-## Recommended Immediate Next Task
-
-Start with:
-
-`Phase A.1 — centralize node validation result generation and normalize current prompt/llm/tool validation messages`
-
-Why:
-
-- it has high user-facing value
-- it is local enough to implement without an immediate architecture split
-- it creates the rule backbone needed by later phases
-
 ---
 
-## Delivery Strategy
+## Post-Plan: Additional Completions (2026-04-24)
 
-Prefer this cadence:
+Beyond the original A–F phases, the following were also implemented:
 
-1. one narrow reliability improvement
-2. one focused test block
-3. one full build + `ctest`
-4. one small push
+- **Port data type system** — 5 types (flow, text, completion, error, http_response) with compatibility constraints
+- **WorkflowGraphModel** — custom DataFlowGraphModel subclass enforcing type-aware connection rules
+- **Copy/paste/duplicate** — Ctrl+C/V/D, Edit menu, right-click context menu, paste at mouse position
+- **Undo command extraction** — 6 commands moved to UndoCommands.hpp/.cpp (widget 2005→1711 lines)
+- **File format versioning** — version 2, backward-compatible with v1
 
-Avoid combining:
+## Recommended Next Directions
 
-- validation rewrite
-- document abstraction
-- node expansion
-- inspector schema extraction
+All original phases are complete. Future development should focus on:
 
-in a single large patch.
-
----
+1. **Workflow export** — export to LangChain JSON, Python, or other executable formats
+2. **WorkflowDocument abstraction** — further decompose QtNodesEditorWidget
+3. **Multi-node operations** — rubber band selection, batch move, alignment
+4. **Node grouping / sub-workflows**
+5. **Canvas mini-map**
 
 ## Stop Conditions
 
 Pause and reassess before continuing if any of these become true:
 
-- `QtNodesEditorWidget.cpp` keeps growing and mixes more document logic into scene logic
+- `QtNodesEditorWidget.cpp` exceeds ~2000 lines again
 - `MainWindow.cpp` starts owning document state transitions that should belong elsewhere
 - validation rules are duplicated across painter, inspector, and adapter code
-- inspector additions require copy-pasting large connect/set/get blocks for every new node type
-
-If two or more of these are true at once, introduce the focused document/schema abstraction before adding more user-facing features.

@@ -69,9 +69,12 @@ Target names for selective builds:
 |---|---|
 | App shell, menus, toolbar, docks | `src/app/MainWindow.hpp/.cpp` |
 | Node canvas, drag/drop, save/load, dirty state signaling | `src/qtnodes/QtNodesEditorWidget.hpp/.cpp` |
+| Undo commands | `src/qtnodes/UndoCommands.hpp/.cpp` |
+| Graph model with port type constraints | `src/qtnodes/WorkflowGraphModel.hpp/.cpp` |
+| Port data type definitions and compatibility | `src/domain/PortDataTypes.hpp` |
 | Inspector (property editing) | `src/inspector/InspectorPanel.hpp/.cpp` |
 | Inspector field/section schemas | `src/inspector/InspectorFieldSchema.hpp/.cpp` |
-| Node definitions (types, ports, defaults) | `src/registry/BuiltInNodeRegistry.hpp/.cpp` |
+| Node definitions (types, ports, defaults, port types) | `src/registry/BuiltInNodeRegistry.hpp/.cpp` |
 | Custom node card rendering | `src/qtnodes/StyledNodePainter.hpp/.cpp` |
 | Port positioning | `src/qtnodes/EdgeAlignedNodeGeometry.hpp/.cpp` |
 | Node library (left panel) | `src/app/NodeLibraryListWidget.hpp/.cpp` |
@@ -120,6 +123,11 @@ InspectorPanel (user edits a field)
 - [x] **Port count badges** — input→output port counts on library entries
 - [x] **No-results empty state** — message when library search has no matches
 - [x] **Cross-platform CI** — GitHub Actions for Linux/Windows/macOS with Qt 5.15 and Qt 6.5
+- [x] **Copy/paste/duplicate** — Ctrl+C/V/D, Edit menu, right-click context menu
+- [x] **Port data types** — flow, text, completion, error, http_response with compatibility constraints
+- [x] **WorkflowGraphModel** — custom DataFlowGraphModel subclass enforcing port type compatibility
+- [x] **Undo commands extracted** — moved to `UndoCommands.hpp/.cpp` (QtNodesEditorWidget 2005→1711 lines)
+- [x] **File format versioning** — save format version 2, accepts v1 files with forward compatibility
 
 ## What To Build Next
 

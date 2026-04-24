@@ -8,6 +8,7 @@ struct WorkflowPortDefinition
 {
     QString id;
     QString label;
+    QString dataTypeId;
 };
 
 struct WorkflowNodeDefinition

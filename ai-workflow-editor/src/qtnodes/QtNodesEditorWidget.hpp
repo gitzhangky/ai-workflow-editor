@@ -51,6 +51,10 @@ public:
     void deleteSelection();
     void selectAllNodes();
     void centerSelection();
+    void copySelection();
+    void pasteClipboard();
+    void duplicateSelection();
+    bool canPaste() const;
     void undo();
     void redo();
     std::vector<QtNodes::NodeId> selectedNodeIds() const;
@@ -168,6 +172,7 @@ private:
     std::optional<NodeState> selectedState() const;
     QtNodes::ConnectionGraphicsObject *draftConnectionGraphicsObject() const;
     void showCanvasContextMenu(QPoint const &globalPos);
+    void pasteFromClipboardAtPosition(std::optional<QPointF> const &targetScenePos);
     QList<QtNodes::NodeId> sortedNodeIds() const;
 
     BuiltInNodeRegistry _builtInNodeRegistry;

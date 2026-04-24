@@ -39,268 +39,101 @@ If the answer is not clearly yes, the feature is likely out of scope or should b
 - Do not place product docs inside `third_party/nodeeditor/`.
 - Prefer implementing product behavior in `ai-workflow-editor/src/...` and only touch `third_party/nodeeditor/` if there is no reasonable adapter-layer alternative.
 
-## Current Product State
+## Current Product State (updated 2026-04-24)
 
 The app is a standalone Qt Widgets desktop application built on top of `QtNodes`.
 
-Implemented today:
+### Fully implemented
 
-- Standalone CMake project with Qt 5 and Qt 6 compatible `find_package` flow.
-- Light-themed workbench shell.
-- Top toolbar, menu bar, left node library, center node canvas, right inspector, bottom status bar.
-- Built-in node types:
-  - `start`
-  - `prompt`
-  - `llm`
-  - `memory`
-  - `retriever`
-  - `templateVariables`
-  - `httpRequest`
-  - `tool`
-  - `condition`
-  - `output`
-- Drag nodes from the left library to the canvas.
-- Visual drop preview on the canvas.
-- Node selection synced to inspector.
-- Type-specific inspector fields for:
-  - `prompt`
-  - `llm`
-  - `memory`
-  - `retriever`
-  - `templateVariables`
-  - `httpRequest`
-  - `tool`
-- Structured node property persistence via JSON save/load.
-- Node validation surfaces are synchronized across:
-  - inspector validation message
-  - node card warning / error state
-  - status bar selection summary
-- Structural connection validation with immediate invalid-drag feedback.
-- Runtime language switching between Chinese and English.
-- Default language is Chinese and language preference is persisted.
-- Custom node card painter and custom node geometry for improved visual styling.
-- Left node library supports:
-  - grouped categories
-  - collapse/expand
-  - search
-  - card-style grouped rendering
-- Basic automated tests for app shell, theme, node library, language behavior, save/load, and canvas behaviors.
-- Toolbar is grouped and visually refreshed for the current light workbench style.
-- Undo / redo currently covers:
-  - node creation
-  - node property edits from Inspector
-  - node deletion
-  - connection creation
-  - connection deletion
-- Dirty state is aligned with undo stack clean state.
-- User-facing operation guide now exists in `docs/user-guide.md`.
+- Standalone CMake project with Qt 5 and Qt 6 compatible `find_package` flow
+- Light-themed workbench shell with menus, toolbar, docks, status bar
+- **13 built-in node types**: start, prompt, llm, agent, memory, retriever, templateVariables, httpRequest, jsonTransform, tool, condition, chatOutput, output
+- **Port data type system**: 5 data types (flow, text, completion, error, http_response) with compatibility constraints — incompatible connections are rejected at the graph model level
+- **WorkflowGraphModel**: custom DataFlowGraphModel subclass that overrides `connectionPossible()` with type-aware compatibility checks
+- Drag/drop from library to canvas with centered visual preview
+- Custom node card painter and edge-aligned port geometry
+- Type-specific inspector for all 13 node types via InspectorFieldSchema
+- **Copy/paste/duplicate**: Ctrl+C/V/D, Edit menu, right-click context menu; paste places nodes at mouse cursor position
+- **JSON save/load** with full property round-trip (file format version 2, accepts v1)
+- **Undo/redo**: full QUndoStack covering create, delete, edit, connect, disconnect — commands extracted to `UndoCommands.hpp/.cpp`
+- **Dirty-state tracking** aligned with undo stack clean state
+- **Close/new/open confirmation** prompts before discarding unsaved work
+- **Recent files menu** persisted via QSettings
+- **Save As** action
+- **Delete selection**: via Edit menu, keyboard shortcuts (Delete/Backspace), right-click context menu
+- **Node-level validation**: inline badges, border color changes, inspector field highlighting, status bar summary
+- Runtime Chinese/English language switching (default Chinese)
+- Grouped node library with search, collapse, port count badges, no-results empty state
+- Zoom indicator in status bar
+- **Cross-platform CI**: GitHub Actions for Linux/Windows/macOS × Qt 5.15/6.5
 
-Documentation rule:
-
-- Any user-visible feature change should update:
-  - `docs/user-guide.md`
-  - `docs/README.md`
-
-Not implemented yet:
+### Not implemented yet
 
 - Workflow execution engine
-- Search/filter inside the canvas
+- Workflow export to executable format (LangChain JSON, Python, etc.)
+- Canvas internal search/filter
+- Node grouping / sub-workflows
+- Multi-node batch operations beyond delete
 - Plugin system
-- Packaging/deployment
-- Windows CI
-- Full runtime semantics for integration / retrieval nodes
-- More advanced node types after the current minimal vertical slices:
-  - `json transform`
-  - `agent`
-  - `chat output`
+- Packaging / deployment
+- Mini-map
 
 ## Important Product Decisions
 
 - This is a product project, not a fork of `QtNodes`.
 - The visual direction is a light, professional workbench.
 - Default UI language is Chinese.
-- More languages may be added later.
 - The editor currently focuses on composition and persistence, not execution.
-- The long-term role of the product is to orchestrate external AI capabilities, not to implement the models themselves.
 - `QVariantMap` is intentionally used for node property storage at this stage because node types are still evolving.
-- New node work should continue as editor-side authoring features first:
-  - definition
-  - ports
-  - inspector
-  - validation
-  - persistence
-  - icon
-  - tests
-  before any execution/runtime behavior is considered.
-
-## Handoff Snapshot
-
-This handoff reflects the state after the following development waves were completed locally and pushed from `main`:
-
-- editing reliability
-  - delete connection undo/redo
-  - create connection undo/redo
-  - action enable/disable state sync
-  - dirty/clean alignment with undo stack
-- validation consolidation
-  - prompt / llm / tool / flow validation unified through one rule path
-  - field-level validation highlighting in Inspector
-- inspector maintainability
-  - field schema extraction
-  - section schema extraction
-  - placeholder / help text / runtime retranslation handled through schema
-- node-language expansion minimal slices
-  - `memory`
-  - `retriever`
-  - `templateVariables`
-  - `httpRequest`
-- user documentation
-  - first-run usage guide
-  - quick-start and FAQ
-  - node-specific examples for current built-in nodes
-
-## Recommended Immediate Next Step
-
-If a new coding agent opens this project now, the recommended next task is:
-
-`Implement the minimal vertical slice for json transform.`
-
-That slice should follow the same pattern as `memory`, `retriever`, `templateVariables`, and `httpRequest`:
-
-- add the built-in node definition
-- add icon and node library entry
-- add Inspector schema + fields
-- add validation rules
-- ensure save/load persistence works
-- update `docs/user-guide.md`
-- add tests first in:
-  - `tests/domain/BuiltInNodeRegistryTests.cpp`
-  - `tests/app/MainWindowTests.cpp`
-
-After `json transform`, continue the current recommended order from `docs/plans/2026-04-23-beta-usability-priority-plan.md`:
-
-1. `agent`
-2. `chat output`
-3. cross-platform hardening and CI
-
-Before starting new implementation work, read:
-
-1. `docs/user-guide.md`
-2. `docs/2026-04-22-claude-code-handoff.md`
-3. `docs/plans/2026-04-23-beta-usability-priority-plan.md`
+- Port data types are defined in `PortDataTypes.hpp`; the compatibility rule is: `flow` inputs accept any output type, other types require exact match.
+- File format version is 2; loading rejects version > 2 and accepts version 1 (backward compatible).
 
 ## Code Map
 
 ### App Shell
 
-- `src/main.cpp`
-  - App bootstrap
-  - Creates `LanguageManager`
-  - Applies `LightTheme`
-  - Shows `MainWindow`
-
-- `src/app/MainWindow.hpp`
-- `src/app/MainWindow.cpp`
-  - Main workbench shell
-  - Menus, toolbar, docks, language menu, file open/save/save-as actions
-  - Dirty-state tracking and clean-state sync (`markDirty`, `clearDirty`, `updateWindowTitle`)
-  - Close/new/open unsaved confirmation (`maybeSave`, `closeEvent`)
-  - Recent files menu (`addToRecentFiles`, `rebuildRecentFilesMenu`, persisted in QSettings)
-  - Action enablement sync for delete / undo / redo / center / select all
-  - Node library creation and population
-  - Wires editor and inspector together
-
-- `src/app/LanguageManager.hpp`
-- `src/app/LanguageManager.cpp`
-  - Default Chinese
-  - Runtime language switching
-  - Uses embedded `.qm` resources
-  - Stores preference in `QSettings`
-
-- `src/app/LightTheme.hpp`
-- `src/app/LightTheme.cpp`
-  - Applies palette and QSS
-  - Initializes `breeze` and `app_theme` resources
+- `src/main.cpp` — bootstrap, creates LanguageManager, applies LightTheme, shows MainWindow
+- `src/app/MainWindow.hpp/.cpp` (~695 lines) — menus, toolbar, docks, language menu, file actions, dirty-state, recent files, action enablement, copy/paste/duplicate wiring
+- `src/app/LanguageManager.hpp/.cpp` — runtime language switching, persisted preference
+- `src/app/LightTheme.hpp/.cpp` — palette and QSS application
 
 ### Node Library
 
-- `src/app/NodeLibraryListWidget.hpp`
-- `src/app/NodeLibraryListWidget.cpp`
-  - Left library widget
-  - Drag MIME payload
-  - Search filtering
-  - Section collapse state
-  - Custom delegate drawing for grouped cards
+- `src/app/NodeLibraryListWidget.hpp/.cpp` — left panel, drag MIME, search filter, section collapse, port count badges, custom delegate
 
 ### Domain and Registry
 
-- `src/domain/WorkflowNodeDefinition.hpp`
-- `src/domain/WorkflowNodeDefinition.cpp`
-  - Node definition data structure
-
-- `src/registry/BuiltInNodeRegistry.hpp`
-- `src/registry/BuiltInNodeRegistry.cpp`
-  - Built-in node definitions
-  - Category names, display names, descriptions, default properties, ports
+- `src/domain/WorkflowNodeDefinition.hpp/.cpp` — node definition struct with `WorkflowPortDefinition` (id, label, dataTypeId)
+- `src/domain/PortDataTypes.hpp` — port data type constants (flow, text, completion, error, http_response) and `areCompatible()` function
+- `src/registry/BuiltInNodeRegistry.hpp/.cpp` — 13 built-in node definitions with port type assignments
 
 ### Inspector
 
-- `src/inspector/InspectorPanel.hpp`
-- `src/inspector/InspectorPanel.cpp`
-  - Shared name/description editing
-  - Schema-driven type-specific sections and fields
-  - Field-level validation highlighting
-  - Runtime retranslation
-
-- `src/inspector/InspectorFieldSchema.hpp`
-- `src/inspector/InspectorFieldSchema.cpp`
-  - Inspector field and section schema definitions
-  - Stable object-name contract for tests
-  - Placeholder/help text metadata
+- `src/inspector/InspectorPanel.hpp/.cpp` (~607 lines) — shared name/description editing, schema-driven fields, field-level validation highlighting
+- `src/inspector/InspectorFieldSchema.hpp/.cpp` — inspector field and section schema definitions
 
 ### QtNodes Adapter Layer
 
-- `src/qtnodes/QtNodesEditorWidget.hpp`
-- `src/qtnodes/QtNodesEditorWidget.cpp`
-  - Scene/view container
-  - Node creation
-  - Drag/drop acceptance
-  - Save/load workflow JSON
-  - Selection propagation
-  - Node style application
-  - Undo/redo command stack orchestration
-  - Validation result creation for node cards / inspector / status bar
-  - Emits `workflowModified()` on any document mutation
-
-- `src/qtnodes/StaticNodeDelegateModel.hpp`
-- `src/qtnodes/StaticNodeDelegateModel.cpp`
-  - Delegate model implementation for built-in nodes
-
-- `src/qtnodes/StyledNodePainter.hpp`
-- `src/qtnodes/StyledNodePainter.cpp`
-  - Custom node card rendering
-
-- `src/qtnodes/EdgeAlignedNodeGeometry.hpp`
-- `src/qtnodes/EdgeAlignedNodeGeometry.cpp`
-  - Port positioning and edge alignment behavior
+- `src/qtnodes/QtNodesEditorWidget.hpp/.cpp` (~1711 lines) — scene/view container, node CRUD, drag/drop, save/load (v2), selection, validation, copy/paste, context menu
+- `src/qtnodes/UndoCommands.hpp/.cpp` (~258 lines) — 6 QUndoCommand subclasses: NodeCreate, NodeDeleteSelection, ConnectionCreate, NodeDisplayNameEdit, NodeDescriptionEdit, NodePropertyEdit
+- `src/qtnodes/WorkflowGraphModel.hpp/.cpp` — DataFlowGraphModel subclass with port type compatibility in `connectionPossible()`
+- `src/qtnodes/StaticNodeDelegateModel.hpp/.cpp` — delegate model returning per-port data types
+- `src/qtnodes/StyledNodePainter.hpp/.cpp` — custom node card rendering
+- `src/qtnodes/EdgeAlignedNodeGeometry.hpp/.cpp` — port positioning
 
 ### Resources
 
-- `src/resources/styles/workbench.qss`
-  - App-wide light workbench styling
-
-- `src/resources/app_theme.qrc`
-  - Toolbar icons, node icons, QSS
-
-- `src/i18n/ai_workflow_editor_zh_CN.ts`
-  - Chinese translation source
+- `src/resources/styles/workbench.qss` — light workbench styling
+- `src/resources/app_theme.qrc` — toolbar icons, 16 node SVG icons, QSS
+- `src/i18n/ai_workflow_editor_zh_CN.ts` — Chinese translations
 
 ### Tests
 
-- `tests/app/MainWindowTests.cpp`
-- `tests/app/LightThemeTests.cpp`
-- `tests/app/NodeLibraryListWidgetTests.cpp`
-- `tests/domain/BuiltInNodeRegistryTests.cpp`
+- `tests/app/MainWindowTests.cpp` — ~107 test methods covering full integration
+- `tests/app/LightThemeTests.cpp` — 3 tests
+- `tests/app/NodeLibraryListWidgetTests.cpp` — 14 tests
+- `tests/domain/BuiltInNodeRegistryTests.cpp` — 10 tests
+- **4/4 test suites, all passing**
 
 ## Build and Test
 
@@ -308,7 +141,7 @@ From the repository root:
 
 ```bash
 cmake -S ai-workflow-editor -B ai-workflow-editor/build
-cmake --build ai-workflow-editor/build --target ai-workflow-editor
+cmake --build ai-workflow-editor/build
 ctest --test-dir ai-workflow-editor/build --output-on-failure
 ```
 
@@ -318,104 +151,33 @@ To launch:
 ./ai-workflow-editor/build/ai-workflow-editor
 ```
 
-Full verification command currently expected after each feature slice:
-
-```bash
-cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeeditor/ai-workflow-editor/build --target ai_workflow_editor_domain_tests ai_workflow_editor_app_tests ai_workflow_editor_theme_tests ai_workflow_editor_widget_tests ai-workflow-editor
-ctest --test-dir /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeeditor/ai-workflow-editor/build --output-on-failure
-```
-
 ## Compatibility Notes
 
-Current status:
+- Qt 5.15 on macOS is the primary development environment
+- CI tests Linux/Windows/macOS with both Qt 5.15 and Qt 6.5
+- `third_party/nodeeditor` requires OpenGL support
+- `BreezeStyleSheets` is fetched during configure (needs git + network)
 
-- Static review does not show an obvious source-level blocker for Qt 5.13.2.
-- The app has no product-layer macOS-only APIs.
-- The app should remain portable to Windows with Qt Widgets.
+## Recommended Next Development Directions
 
-Compatibility work already done:
+The original 6-phase plan is fully complete. The following directions were identified from an objective assessment:
 
-- Top-level `cmake_minimum_required` reduced to `3.16`.
-- `Qt::Test` is no longer required in non-test builds.
+1. **Workflow export** — allow exporting workflows to executable formats (LangChain JSON, Python code, etc.)
+2. **Further QtNodesEditorWidget decomposition** — extract WorkflowDocument abstraction for document model + serialization (still ~1711 lines)
+3. **Multi-node operations** — rubber band selection, batch move, alignment
+4. **Node grouping / sub-workflows**
+5. **Canvas mini-map**
 
-Still important for Windows + Qt 5.13.2:
+## Rules For The Next Agent
 
-- Ensure the environment provides:
-  - `Qt Core`
-  - `Qt Gui`
-  - `Qt Widgets`
-  - `Qt Svg`
-  - `LinguistTools`
-- `third_party/nodeeditor` requires OpenGL support.
-- `BreezeStyleSheets` is fetched during configure, so the build machine needs `git` and network access unless the dependency is vendored locally.
-- Real Windows CI has not been set up yet, so Windows compatibility is not yet continuously verified.
-
-## Known Technical Debt
-
-- `Undo` and `Redo` actions are present in UI but not wired to actual command stacks.
-- Save/load currently lives in the editor adapter layer rather than a stronger document model.
-- Node properties are only typed at the form level, not via a formal schema engine.
-- Left node library visuals have been iterated heavily; if restyling again, keep the custom delegate as the single source of truth.
-- There is no explicit document object like `WorkflowDocument` yet. If `MainWindow.cpp` grows past ~600 lines, extract one.
-- No node/connection deletion flow yet — users cannot remove items from the canvas.
-
-## Recommended Next Development Order
-
-The next coding agent should continue in this order:
-
-1. Workflow document behavior
-2. Node editing affordances
-3. Validation and status feedback
-4. Node type expansion
-5. Cross-platform and release hardening
-
-See the companion plan file:
-
-- `docs/plans/2026-04-22-next-development-plan.md`
-
-## Suggested Rules For The Next Agent
-
-- Keep changes inside `ai-workflow-editor/` unless a dependency change is truly necessary.
-- Preserve the light visual language.
-- Keep Chinese as the default UI language.
-- Run targeted tests after each UI or behavior change.
-- Run the full test suite before claiming completion.
-- When changing left node library visuals, inspect both:
-  - `NodeLibraryListWidget.cpp`
-  - `workbench.qss`
-- When changing node card visuals, inspect both:
-  - `StyledNodePainter.cpp`
-  - `EdgeAlignedNodeGeometry.cpp`
-- When changing inspector behavior, inspect both:
-  - `InspectorPanel.cpp`
-  - `QtNodesEditorWidget.cpp`
-- Any operation that mutates document state must emit `workflowModified()` from `QtNodesEditorWidget`.
-- Add Chinese translations to `ai_workflow_editor_zh_CN.ts` for all new user-facing strings.
-- See `CLAUDE.md` at repo root for the full agent guide.
-
-## Best Immediate Next Task
-
-If an agent is going to continue immediately, the best next task is:
-
-`Add delete selected node/connection, right-click context menu, and keyboard shortcuts.`
-
-Why this should go next:
-
-- Users can create nodes and connections but cannot remove them without editing the JSON file.
-- This is the most basic editing operation still missing.
-- It does not require architectural changes — deletion goes through `DataFlowGraphModel` and `_nodeStates`.
-
-## Verification Baseline
-
-Before starting new work, confirm these still pass:
-
-```bash
-cmake -S ai-workflow-editor -B ai-workflow-editor/build
-cmake --build ai-workflow-editor/build --target ai_workflow_editor_domain_tests ai_workflow_editor_app_tests ai_workflow_editor_theme_tests ai_workflow_editor_widget_tests ai-workflow-editor
-ctest --test-dir ai-workflow-editor/build --output-on-failure
-```
-
-Expected current result:
-
-- `4/4` test suites passing
-- App test suite includes 30 test functions (23 original + 7 Phase 1 additions)
+1. Keep changes inside `ai-workflow-editor/` unless a dependency change is truly necessary.
+2. Run the full test suite before AND after making changes.
+3. When changing inspector behavior, check both `InspectorPanel.cpp` and `QtNodesEditorWidget.cpp`.
+4. When changing node card visuals, check both `StyledNodePainter.cpp` and `EdgeAlignedNodeGeometry.cpp`.
+5. When changing node library visuals, check both `NodeLibraryListWidget.cpp` and `workbench.qss`.
+6. Add Chinese translations to `ai_workflow_editor_zh_CN.ts` for any new user-facing strings.
+7. Emit `workflowModified()` from `QtNodesEditorWidget` for any operation that changes document state.
+8. Write Qt Test cases for new behavior in the appropriate test file under `tests/`.
+9. When adding new port types, update `PortDataTypes.hpp` and the compatibility function.
+10. When adding new node types, assign `dataTypeId` to every port in `BuiltInNodeRegistry.cpp`.
+11. See `CLAUDE.md` at repo root for the full agent guide.

@@ -169,6 +169,9 @@
     <message><source>Loaded %1</source><translation>已加载 %1</translation></message>
     <message><source>Save As...</source><translation>另存为...</translation></message>
     <message><source>Recent Files</source><translation>最近文件</translation></message>
+    <message><source>Copy</source><translation>复制</translation></message>
+    <message><source>Paste</source><translation>粘贴</translation></message>
+    <message><source>Duplicate</source><translation>复制副本</translation></message>
     <message><source>Delete</source><translation>删除</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>
     <message><source>%1: Passed validation</source><translation>%1：已通过检查</translation></message>
@@ -205,6 +208,9 @@ Do you want to save before continuing?</source><translation>当前工作流有�
     <message><source>Drag to a compatible port.</source><translation>拖到兼容的端口上进行连接。</translation></message>
     <message><source>Release to connect to %1</source><translation>松开以连接到 %1</translation></message>
     <message><source>This port cannot accept the connection.</source><translation>此端口不能接受当前连接。</translation></message>
+    <message><source>Copy</source><translation>复制</translation></message>
+    <message><source>Paste</source><translation>粘贴</translation></message>
+    <message><source>Duplicate</source><translation>复制副本</translation></message>
     <message><source>Delete Node</source><translation>删除节点</translation></message>
     <message><source>Delete Connection</source><translation>删除连接</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>

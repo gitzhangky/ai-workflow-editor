@@ -180,6 +180,13 @@ private slots:
     void showsZoomIndicatorInStatusBar();
     void nodeLibraryShowsPortCountBadges();
     void nodeLibraryShowsNoResultsWhenFilterHasNoMatch();
+    void editMenuContainsCopyPasteDuplicateActions();
+    void assignsCopyPasteDuplicateKeyboardShortcuts();
+    void enablesCopyPasteDuplicateActionsBasedOnState();
+    void copiesAndPastesNodeOnCanvas();
+    void duplicatesNodeOnCanvas();
+    void allowsCompatiblePortConnections();
+    void rejectsIncompatiblePortConnections();
 };
 
 void MainWindowTests::initTestCase()
@@ -3139,6 +3146,153 @@ void MainWindowTests::nodeLibraryShowsNoResultsWhenFilterHasNoMatch()
     QCoreApplication::processEvents();
     QVERIFY(!noResultsLabel->isVisible());
     QVERIFY(list->visibleNodeCount() > 0);
+}
+
+void MainWindowTests::editMenuContainsCopyPasteDuplicateActions()
+{
+    LanguageManager languageManager;
+    languageManager.setLanguage(LanguageManager::Language::English);
+    MainWindow window(&languageManager);
+
+    auto *editMenu = window.findChild<QMenu *>("editMenu");
+    QVERIFY(editMenu != nullptr);
+
+    QStringList actionTexts;
+    for (auto *action : editMenu->actions()) {
+        if (!action->isSeparator())
+            actionTexts.append(action->text());
+    }
+
+    QVERIFY(actionTexts.contains("Copy"));
+    QVERIFY(actionTexts.contains("Paste"));
+    QVERIFY(actionTexts.contains("Duplicate"));
+}
+
+void MainWindowTests::assignsCopyPasteDuplicateKeyboardShortcuts()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *copyAction = window.findChild<QAction *>("copyAction");
+    auto *pasteAction = window.findChild<QAction *>("pasteAction");
+    auto *duplicateAction = window.findChild<QAction *>("duplicateAction");
+    QVERIFY(copyAction != nullptr);
+    QVERIFY(pasteAction != nullptr);
+    QVERIFY(duplicateAction != nullptr);
+
+    QCOMPARE(copyAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Copy).constFirst());
+    QCOMPARE(pasteAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Paste).constFirst());
+    QCOMPARE(duplicateAction->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_D));
+}
+
+void MainWindowTests::enablesCopyPasteDuplicateActionsBasedOnState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *copyAction = window.findChild<QAction *>("copyAction");
+    auto *pasteAction = window.findChild<QAction *>("pasteAction");
+    auto *duplicateAction = window.findChild<QAction *>("duplicateAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(copyAction != nullptr);
+    QVERIFY(pasteAction != nullptr);
+    QVERIFY(duplicateAction != nullptr);
+
+    QVERIFY(!copyAction->isEnabled());
+    QVERIFY(!duplicateAction->isEnabled());
+
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+
+    QVERIFY(copyAction->isEnabled());
+    QVERIFY(duplicateAction->isEnabled());
+
+    clearCanvasSelection(editor);
+
+    QVERIFY(!copyAction->isEnabled());
+    QVERIFY(!duplicateAction->isEnabled());
+}
+
+void MainWindowTests::copiesAndPastesNodeOnCanvas()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QCOMPARE(editor->nodeCount(), 1);
+
+    editor->copySelection();
+    QVERIFY(editor->canPaste());
+
+    editor->pasteClipboard();
+    QCOMPARE(editor->nodeCount(), 2);
+}
+
+void MainWindowTests::duplicatesNodeOnCanvas()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QCOMPARE(editor->nodeCount(), 1);
+
+    editor->duplicateSelection();
+    QCOMPARE(editor->nodeCount(), 2);
+}
+
+void MainWindowTests::allowsCompatiblePortConnections()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    // start(out:flow) -> prompt(in:flow) — same type
+    const auto startNode = editor->createNode("start");
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(editor->connectNodes(startNode, 0, promptNode, 0));
+
+    // prompt(out:text) -> llm(in:text) — same type
+    const auto llmNode = editor->createNode("llm");
+    QVERIFY(editor->connectNodes(promptNode, 0, llmNode, 0));
+
+    // llm(success:completion) -> output(in:flow) — flow accepts anything
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(editor->connectNodes(llmNode, 0, outputNode, 0));
+}
+
+void MainWindowTests::rejectsIncompatiblePortConnections()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    // llm(success:completion) -> llm2(in:text) — completion != text
+    const auto llmNode1 = editor->createNode("llm");
+    const auto llmNode2 = editor->createNode("llm");
+    QVERIFY(!editor->connectNodes(llmNode1, 0, llmNode2, 0));
+
+    // prompt(out:text) -> prompt2(in:flow) — text -> flow is accepted (flow accepts all)
+    const auto promptNode1 = editor->createNode("prompt");
+    const auto promptNode2 = editor->createNode("prompt");
+    QVERIFY(editor->connectNodes(promptNode1, 0, promptNode2, 0));
+
+    // httpRequest(success:http_response) -> llm(in:text) — incompatible
+    const auto httpNode = editor->createNode("httpRequest");
+    const auto llmNode3 = editor->createNode("llm");
+    QVERIFY(!editor->connectNodes(httpNode, 0, llmNode3, 0));
 }
 
 QTEST_MAIN(MainWindowTests)

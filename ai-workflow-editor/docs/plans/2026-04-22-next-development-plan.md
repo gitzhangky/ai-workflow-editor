@@ -244,6 +244,34 @@ Use this exact order:
 7. ~~canvas and library polish~~ ✅ completed 2026-04-24
 8. ~~cross-platform CI~~ ✅ completed 2026-04-24
 
+## Post-Plan Completions (2026-04-24)
+
+After all 8 original plan items were completed, the following additional features were implemented:
+
+9. ~~copy/paste/duplicate~~ ✅ completed 2026-04-24
+   - Ctrl+C/V/D keyboard shortcuts, Edit menu entries, right-click context menu
+   - Paste places nodes at mouse cursor position
+   - Duplicate uses fixed +40px offset
+10. ~~undo command extraction~~ ✅ completed 2026-04-24
+    - 6 QUndoCommand subclasses moved from QtNodesEditorWidget.cpp to UndoCommands.hpp/.cpp
+    - QtNodesEditorWidget reduced from 2005 to 1711 lines
+11. ~~port data type system~~ ✅ completed 2026-04-24
+    - 5 data types: flow, text, completion, error, http_response
+    - WorkflowGraphModel subclass overrides connectionPossible() with compatibility matrix
+    - "flow" inputs accept any output type; other types require exact match
+    - Per-port dataTypeId in WorkflowPortDefinition and BuiltInNodeRegistry
+12. ~~file format versioning~~ ✅ completed 2026-04-24
+    - Save format bumped to version 2
+    - Load validates version (accepts 1-2, rejects others)
+
+## Recommended Next Directions
+
+1. **Workflow export** — export to LangChain JSON, Python code, or other executable formats
+2. **WorkflowDocument abstraction** — further decompose QtNodesEditorWidget (~1711 lines)
+3. **Multi-node operations** — rubber band selection, batch move, alignment
+4. **Node grouping / sub-workflows**
+5. **Canvas mini-map**
+
 ## Stop Conditions
 
 Pause and reassess before further feature growth if any of these happen:

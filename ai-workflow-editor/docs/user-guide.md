@@ -139,6 +139,13 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - `输出` 没有输出端口
 - `条件` 有两个输出端口：`True` 和 `False`
 - `大模型` 有两个输出端口：`Success` 和 `Error`
+- 端口有数据类型约束，不兼容的端口之间无法连线：
+  - `flow`（通用流）：`开始`、`记忆`、`检索器`、`模板变量`、`工具`、`条件` 等使用
+  - `text`（文本）：`提示词` 输出 → `大模型` / `Agent` 输入
+  - `completion`（完成结果）：`大模型` / `Agent` 的 Success 输出
+  - `error`（错误）：`大模型` / `Agent` / `HTTP 请求` 的 Error 输出
+  - `http_response`（HTTP 响应）：`HTTP 请求` 的 Success 输出
+  - 通用流（`flow`）输入端口可以接受任何类型的输出
 
 如果连线不合法，状态栏会直接提示，节点也会显示 warning / error 状态。
 
@@ -326,6 +333,15 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - 点击连线：选中连线
 - `全选`：选择当前画布内容
 
+### 复制 / 粘贴 / 复制副本
+
+- `Command+C`：复制选中节点
+- `Command+V`：粘贴到鼠标光标位置
+- `Command+D`：复制副本（原位偏移 +40px）
+- 也可以通过 `编辑` 菜单或右键菜单操作
+
+粘贴时节点组会以鼠标当前位置为中心放置。复制副本是"复制 + 立即粘贴"的快捷操作。
+
 ### 删除
 
 - 选中节点或连线后按 `Delete`
@@ -383,6 +399,9 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - `Undo`：系统标准撤销快捷键
 - `Redo`：系统标准重做快捷键
 - `Select All`：系统标准全选快捷键
+- `Copy`：系统标准复制快捷键
+- `Paste`：系统标准粘贴快捷键
+- `Duplicate`：`Command+D`
 - `Delete`：`Delete`
 - `Center`：`Space`
 

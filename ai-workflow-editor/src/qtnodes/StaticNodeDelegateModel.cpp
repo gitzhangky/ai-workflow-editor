@@ -1,5 +1,6 @@
 #include "qtnodes/StaticNodeDelegateModel.hpp"
 
+#include "domain/PortDataTypes.hpp"
 #include "qtnodes/StaticNodeData.hpp"
 
 StaticNodeDelegateModel::StaticNodeDelegateModel(WorkflowNodeDefinition definition)
@@ -32,9 +33,15 @@ unsigned int StaticNodeDelegateModel::nPorts(QtNodes::PortType portType) const
     return static_cast<unsigned int>(_definition.outputPorts.size());
 }
 
-QtNodes::NodeDataType StaticNodeDelegateModel::dataType(QtNodes::PortType, QtNodes::PortIndex) const
+QtNodes::NodeDataType StaticNodeDelegateModel::dataType(QtNodes::PortType portType, QtNodes::PortIndex portIndex) const
 {
-    return _data->type();
+    auto const &ports = (portType == QtNodes::PortType::In) ? _definition.inputPorts
+                                                            : _definition.outputPorts;
+    const int index = static_cast<int>(portIndex);
+    if (index >= 0 && index < ports.size() && !ports[index].dataTypeId.isEmpty())
+        return {ports[index].dataTypeId, ports[index].label};
+
+    return {PortDataTypes::flow(), QStringLiteral("Flow")};
 }
 
 std::shared_ptr<QtNodes::NodeData> StaticNodeDelegateModel::outData(QtNodes::PortIndex)
