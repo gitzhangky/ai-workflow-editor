@@ -60,6 +60,22 @@ QRectF CanvasMiniMapWidget::viewportIndicatorRect() const
     return _viewportIndicatorRect;
 }
 
+QVector<QRectF> CanvasMiniMapWidget::nodeIndicatorRects() const
+{
+    QVector<QRectF> mappedRects;
+    mappedRects.reserve(_nodeSceneRects.size());
+
+    for (auto const &sceneNodeRect : _nodeSceneRects) {
+        const QRectF mappedRect = mapSceneRectToDisplay(sceneNodeRect);
+        mappedRects.append(mappedRect.adjusted(0.0,
+                                               0.0,
+                                               std::max(2.0 - mappedRect.width(), 0.0),
+                                               std::max(2.0 - mappedRect.height(), 0.0)));
+    }
+
+    return mappedRects;
+}
+
 bool CanvasMiniMapWidget::hasContent() const
 {
     return _hasContent;
@@ -86,13 +102,8 @@ void CanvasMiniMapWidget::paintEvent(QPaintEvent *event)
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(QStringLiteral("#b7ab97")));
-    for (auto const &sceneNodeRect : _nodeSceneRects) {
-        const QRectF mappedRect = mapSceneRectToDisplay(sceneNodeRect);
-        const QRectF nodeRect = mappedRect.adjusted(0.0, 0.0,
-                                                    std::max(2.0 - mappedRect.width(), 0.0),
-                                                    std::max(2.0 - mappedRect.height(), 0.0));
+    for (auto const &nodeRect : nodeIndicatorRects())
         painter.drawRoundedRect(nodeRect, 2.0, 2.0);
-    }
 
     painter.setBrush(QColor(165, 137, 101, 28));
     painter.setPen(QPen(QColor(QStringLiteral("#a58965")), 1.2));

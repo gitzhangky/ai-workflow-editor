@@ -75,6 +75,7 @@ public:
     bool miniMapVisible() const;
     QRect miniMapGeometry() const;
     QRectF miniMapViewportIndicatorRect() const;
+    QVector<QRectF> miniMapNodeIndicatorRects() const;
     QPointF viewportSceneCenter() const;
     QVariantMap nodeStyle(QtNodes::NodeId nodeId) const;
     QString nodeValidationState(QtNodes::NodeId nodeId) const;

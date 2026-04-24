@@ -11,6 +11,7 @@
 #include <QtNodes/internal/ConnectionGraphicsObject.hpp>
 #include <QtNodes/internal/locateNode.hpp>
 #include <QtNodes/internal/NodeConnectionInteraction.hpp>
+#include <QtNodes/internal/NodeGraphicsObject.hpp>
 #include <QtNodes/ConnectionStyle>
 #include <QtNodes/DataFlowGraphModel>
 #include <QtNodes/DataFlowGraphicsScene>
@@ -592,6 +593,12 @@ QRectF QtNodesEditorWidget::miniMapViewportIndicatorRect() const
 {
     auto const *miniMap = qobject_cast<CanvasMiniMapWidget const *>(_miniMap);
     return miniMap != nullptr ? miniMap->viewportIndicatorRect() : QRectF();
+}
+
+QVector<QRectF> QtNodesEditorWidget::miniMapNodeIndicatorRects() const
+{
+    auto const *miniMap = qobject_cast<CanvasMiniMapWidget const *>(_miniMap);
+    return miniMap != nullptr ? miniMap->nodeIndicatorRects() : QVector<QRectF>();
 }
 
 QPointF QtNodesEditorWidget::viewportSceneCenter() const
@@ -1733,7 +1740,10 @@ void QtNodesEditorWidget::updateMiniMap()
         if (!_graphModel->nodeExists(nodeId))
             continue;
 
-        const QPointF position = _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
+        const auto *nodeGraphicsObject = _scene->nodeGraphicsObject(nodeId);
+        const QPointF position = nodeGraphicsObject != nullptr
+                                     ? nodeGraphicsObject->scenePos()
+                                     : _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
         const QSize size = _scene->nodeGeometry().size(nodeId);
         if (!size.isValid())
             continue;

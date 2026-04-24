@@ -15,6 +15,7 @@ public:
 
     void setSceneSnapshot(QVector<QRectF> const &nodeSceneRects, QRectF const &viewportSceneRect);
     QRectF viewportIndicatorRect() const;
+    QVector<QRectF> nodeIndicatorRects() const;
     bool hasContent() const;
 
 protected:

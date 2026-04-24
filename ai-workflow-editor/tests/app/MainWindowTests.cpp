@@ -99,6 +99,7 @@ private slots:
     void showsCanvasMiniMapWhenWorkflowHasNodes();
     void clickingCanvasMiniMapRecentersLargeCanvas();
     void draggingCanvasMiniMapViewportPansWithoutInitialJump();
+    void updatesCanvasMiniMapWhenNodeGraphicsMove();
     void fitWorkflowActionShowsEntireLargeWorkflow();
     void defaultsWorkbenchTextToChinese();
     void keepsChineseDefaultWhenExternalTranslationFileIsUnavailable();
@@ -490,6 +491,42 @@ void MainWindowTests::draggingCanvasMiniMapViewportPansWithoutInitialJump()
     const QPointF afterDragCenter = editor->viewportSceneCenter();
     QVERIFY(afterDragCenter.x() > beforeCenter.x() + 120.0);
     QVERIFY(afterDragCenter.y() > beforeCenter.y() + 80.0);
+}
+
+void MainWindowTests::updatesCanvasMiniMapWhenNodeGraphicsMove()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    editor->setNodePosition(startNode, QPointF(0.0, 0.0));
+    editor->setNodePosition(outputNode, QPointF(2400.0, 1600.0));
+    QCoreApplication::processEvents();
+
+    const auto beforeRects = editor->miniMapNodeIndicatorRects();
+    QVERIFY(beforeRects.size() >= 2);
+    const QPointF beforeStartCenter = beforeRects.front().center();
+
+    auto *startGraphicsObject = selectNodeGraphicsObject(editor, startNode);
+    QVERIFY(startGraphicsObject != nullptr);
+    startGraphicsObject->setPos(QPointF(900.0, 700.0));
+    QCoreApplication::processEvents();
+
+    const auto afterRects = editor->miniMapNodeIndicatorRects();
+    QVERIFY(afterRects.size() >= 2);
+    const QPointF afterStartCenter = afterRects.front().center();
+    QVERIFY(afterStartCenter.x() > beforeStartCenter.x() + 20.0);
+    QVERIFY(afterStartCenter.y() > beforeStartCenter.y() + 20.0);
 }
 
 void MainWindowTests::fitWorkflowActionShowsEntireLargeWorkflow()
