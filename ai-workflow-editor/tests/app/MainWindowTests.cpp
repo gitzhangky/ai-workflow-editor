@@ -28,7 +28,9 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTemporaryDir>
+#include <QTabWidget>
 #include <QTextEdit>
+#include <QTextBrowser>
 #include <QToolButton>
 #include <QToolBar>
 #include <QDragEnterEvent>
@@ -89,6 +91,8 @@ private slots:
     void setsExpectedWindowTitle();
     void createsNodeLibraryAndInspectorDocks();
     void createsWorkflowCanvasInCentralArea();
+    void opensUserGuideInReusableWorkbenchTab();
+    void preservesDockVisibilityPreferenceWhenSwitchingHelpTab();
     void appliesLightWorkbenchCanvasBackground();
     void createsPrimaryToolbarAndStatusBar();
     void showsGroupedToolbarLayout();
@@ -241,9 +245,87 @@ void MainWindowTests::createsWorkflowCanvasInCentralArea()
     LanguageManager languageManager;
     MainWindow window(&languageManager);
 
-    QVERIFY(window.centralWidget() != nullptr);
-    QCOMPARE(window.centralWidget()->objectName(), QString("workflowCanvas"));
-    QVERIFY(window.centralWidget()->findChild<QGraphicsView *>() != nullptr);
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->objectName(), QString("workbenchTabWidget"));
+    QCOMPARE(tabs->count(), 1);
+    QCOMPARE(tabs->tabText(0), QString::fromUtf8("工作流"));
+
+    auto *editor = tabs->widget(0);
+    QVERIFY(editor != nullptr);
+    QCOMPARE(editor->objectName(), QString("workflowCanvas"));
+    QVERIFY(editor->findChild<QGraphicsView *>() != nullptr);
+}
+
+void MainWindowTests::opensUserGuideInReusableWorkbenchTab()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
+    auto *helpAction = window.findChild<QAction *>("helpAction");
+    QVERIFY(tabs != nullptr);
+    QVERIFY(helpAction != nullptr);
+    QCOMPARE(tabs->count(), 1);
+
+    helpAction->trigger();
+    QCOMPARE(tabs->count(), 2);
+    QCOMPARE(tabs->currentIndex(), 1);
+    QCOMPARE(tabs->tabText(1), QString::fromUtf8("用户指南"));
+
+    auto *helpWidget = tabs->widget(1);
+    QVERIFY(helpWidget != nullptr);
+    QCOMPARE(helpWidget->objectName(), QString("helpDocumentWidget"));
+    auto *browser = helpWidget->findChild<QTextBrowser *>("helpDocumentBrowser");
+    QVERIFY(browser != nullptr);
+    QVERIFY(browser->toPlainText().contains(QString::fromUtf8("AI 工作流编辑器")));
+    QVERIFY(browser->toPlainText().contains(QString::fromUtf8("画布小地图")));
+
+    helpAction->trigger();
+    QCOMPARE(tabs->count(), 2);
+    QCOMPARE(tabs->currentIndex(), 1);
+}
+
+void MainWindowTests::preservesDockVisibilityPreferenceWhenSwitchingHelpTab()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
+    auto *helpAction = window.findChild<QAction *>("helpAction");
+    auto *nodeLibraryDock = window.findChild<QDockWidget *>("nodeLibraryDock");
+    auto *inspectorDock = window.findChild<QDockWidget *>("inspectorDock");
+    auto *toggleNodeLibraryAction = window.findChild<QAction *>("toggleNodeLibraryAction");
+    auto *toggleInspectorAction = window.findChild<QAction *>("toggleInspectorAction");
+    QVERIFY(tabs != nullptr);
+    QVERIFY(helpAction != nullptr);
+    QVERIFY(nodeLibraryDock != nullptr);
+    QVERIFY(inspectorDock != nullptr);
+    QVERIFY(toggleNodeLibraryAction != nullptr);
+    QVERIFY(toggleInspectorAction != nullptr);
+
+    QVERIFY(nodeLibraryDock->isVisible());
+    QVERIFY(inspectorDock->isVisible());
+    QVERIFY(toggleNodeLibraryAction->isChecked());
+    QVERIFY(toggleInspectorAction->isChecked());
+
+    helpAction->trigger();
+    QCoreApplication::processEvents();
+
+    QVERIFY(!nodeLibraryDock->isVisible());
+    QVERIFY(!inspectorDock->isVisible());
+    QVERIFY(toggleNodeLibraryAction->isChecked());
+    QVERIFY(toggleInspectorAction->isChecked());
+
+    tabs->setCurrentIndex(0);
+    QCoreApplication::processEvents();
+
+    QVERIFY(nodeLibraryDock->isVisible());
+    QVERIFY(inspectorDock->isVisible());
+    QVERIFY(toggleNodeLibraryAction->isChecked());
+    QVERIFY(toggleInspectorAction->isChecked());
 }
 
 void MainWindowTests::appliesLightWorkbenchCanvasBackground()
@@ -357,11 +439,12 @@ void MainWindowTests::createsMenuBarWithFileViewAndSettingsMenus()
 
     auto *menuBar = window.menuBar();
     QVERIFY(menuBar != nullptr);
-    QCOMPARE(menuBar->actions().size(), 4);
+    QCOMPARE(menuBar->actions().size(), 5);
     QCOMPARE(menuBar->actions().at(0)->text(), QString::fromUtf8("文件"));
     QCOMPARE(menuBar->actions().at(1)->text(), QString::fromUtf8("编辑"));
     QCOMPARE(menuBar->actions().at(2)->text(), QString::fromUtf8("视图"));
     QCOMPARE(menuBar->actions().at(3)->text(), QString::fromUtf8("设置"));
+    QCOMPARE(menuBar->actions().at(4)->text(), QString::fromUtf8("帮助"));
 
     auto *settingsMenu = menuBar->actions().at(3)->menu();
     QVERIFY(settingsMenu != nullptr);
@@ -369,6 +452,12 @@ void MainWindowTests::createsMenuBarWithFileViewAndSettingsMenus()
     QCOMPARE(settingsMenu->actions().at(0)->text(), QString::fromUtf8("语言"));
     QVERIFY(settingsMenu->actions().at(0)->menu() != nullptr);
     QCOMPARE(settingsMenu->actions().at(0)->menu()->actions().size(), 2);
+
+    auto *helpMenu = menuBar->actions().at(4)->menu();
+    QVERIFY(helpMenu != nullptr);
+    QCOMPARE(helpMenu->actions().size(), 1);
+    QCOMPARE(helpMenu->actions().at(0)->objectName(), QString("helpAction"));
+    QCOMPARE(helpMenu->actions().at(0)->text(), QString::fromUtf8("用户指南"));
 }
 
 void MainWindowTests::keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty()
@@ -627,16 +716,25 @@ void MainWindowTests::retranslatesWorkbenchTextToEnglishAtRuntime()
     auto *inspectorDock = window.findChild<QDockWidget *>("inspectorDock");
     auto *nodeLibrary = window.findChild<QListWidget *>("nodeLibraryList");
     auto *hintLabel = window.findChild<QLabel *>("inspectorHintLabel");
+    auto *helpAction = window.findChild<QAction *>("helpAction");
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
 
     QVERIFY(toolbar != nullptr);
     QVERIFY(nodeLibraryDock != nullptr);
     QVERIFY(inspectorDock != nullptr);
     QVERIFY(nodeLibrary != nullptr);
     QVERIFY(hintLabel != nullptr);
+    QVERIFY(helpAction != nullptr);
+    QVERIFY(tabs != nullptr);
+
+    helpAction->trigger();
+    QCOMPARE(tabs->tabText(1), QString::fromUtf8("用户指南"));
 
     QVERIFY(languageManager.setLanguage(LanguageManager::Language::English));
 
     QCOMPARE(window.windowTitle(), QString("AI Workflow Editor"));
+    QCOMPARE(tabs->tabText(0), QString("Workflow"));
+    QCOMPARE(tabs->tabText(1), QString("User Guide"));
     QCOMPARE(toolbar->actions().at(0)->text(), QString("New"));
     QCOMPARE(nodeLibraryDock->windowTitle(), QString("Node Library"));
     QCOMPARE(inspectorDock->windowTitle(), QString("Inspector"));
@@ -645,6 +743,8 @@ void MainWindowTests::retranslatesWorkbenchTextToEnglishAtRuntime()
     QCOMPARE(window.statusBar()->currentMessage(), QString("Ready"));
     QCOMPARE(window.menuBar()->actions().at(0)->text(), QString("File"));
     QCOMPARE(window.menuBar()->actions().at(3)->text(), QString("Settings"));
+    QCOMPARE(window.menuBar()->actions().at(4)->text(), QString("Help"));
+    QCOMPARE(helpAction->text(), QString("User Guide"));
 }
 
 void MainWindowTests::addsIconsToToolbarAndNodeLibrary()
@@ -2144,6 +2244,7 @@ void MainWindowTests::assignsExpectedKeyboardShortcuts()
     auto *centerAction = window.findChild<QAction *>("centerAction");
     auto *fitWorkflowAction = window.findChild<QAction *>("fitWorkflowAction");
     auto *selectAllAction = window.findChild<QAction *>("selectAllAction");
+    auto *helpAction = window.findChild<QAction *>("helpAction");
 
     QVERIFY(newAction != nullptr);
     QVERIFY(openAction != nullptr);
@@ -2155,6 +2256,7 @@ void MainWindowTests::assignsExpectedKeyboardShortcuts()
     QVERIFY(centerAction != nullptr);
     QVERIFY(fitWorkflowAction != nullptr);
     QVERIFY(selectAllAction != nullptr);
+    QVERIFY(helpAction != nullptr);
 
     QCOMPARE(newAction->shortcut(), QKeySequence::keyBindings(QKeySequence::New).constFirst());
     QCOMPARE(openAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Open).constFirst());
@@ -2166,6 +2268,8 @@ void MainWindowTests::assignsExpectedKeyboardShortcuts()
     QCOMPARE(centerAction->shortcut(), QKeySequence(Qt::Key_Space));
     QCOMPARE(fitWorkflowAction->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_0));
     QCOMPARE(selectAllAction->shortcut(), QKeySequence::keyBindings(QKeySequence::SelectAll).constFirst());
+    QCOMPARE(helpAction->shortcut(),
+             QKeySequence::keyBindings(QKeySequence::HelpContents).value(0, QKeySequence(Qt::Key_F1)));
 }
 
 void MainWindowTests::enablesWorkbenchActionsBasedOnEditorState()

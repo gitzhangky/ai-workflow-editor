@@ -18,7 +18,9 @@ class QMenu;
 class QToolBar;
 class QToolButton;
 class QWidget;
+class HelpDocumentWidget;
 class QtNodesEditorWidget;
+class WorkbenchTabWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -51,6 +53,8 @@ private:
     void addToRecentFiles(QString const &filePath);
     void rebuildRecentFilesMenu();
     void exportWorkflow(WorkflowExporter::Format format);
+    void openHelpTab();
+    void handleTabChanged(int index);
 
     LanguageManager *_languageManager;
     QMenu *_fileMenu;
@@ -67,7 +71,9 @@ private:
     QLineEdit *_nodeLibrarySearchEdit;
     QLabel *_noSearchResultsLabel;
     InspectorPanel *_inspectorPanel;
+    WorkbenchTabWidget *_tabWidget;
     QtNodesEditorWidget *_editorWidget;
+    HelpDocumentWidget *_helpWidget;
     QLabel *_selectionValidationSummaryLabel;
     QLabel *_zoomIndicatorLabel;
     QAction *_newAction;
@@ -93,6 +99,8 @@ private:
     QAction *_languageMenuAction;
     QAction *_languageChineseAction;
     QAction *_languageEnglishAction;
+    QMenu *_helpMenu;
+    QAction *_helpAction;
     QToolButton *_languageToolButton;
     QString _currentWorkflowPath;
     QString _currentSelectedNodeDisplayName;

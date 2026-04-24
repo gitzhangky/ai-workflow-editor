@@ -96,10 +96,12 @@ target_link_libraries(ai_workflow_editor_breeze_resources
 )
 
 add_library(ai_workflow_editor_lib
+  src/app/HelpDocumentWidget.cpp
   src/app/LanguageManager.cpp
   src/app/LightTheme.cpp
   src/app/MainWindow.cpp
   src/app/NodeLibraryListWidget.cpp
+  src/app/WorkbenchTabWidget.cpp
   src/domain/WorkflowNodeDefinition.cpp
   src/inspector/InspectorFieldSchema.cpp
   src/inspector/InspectorPanel.cpp

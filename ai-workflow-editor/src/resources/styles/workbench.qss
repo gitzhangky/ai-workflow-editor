@@ -319,3 +319,41 @@ QLabel#noSearchResultsLabel {
     color: #8a7d70;
     padding: 20px 12px;
 }
+
+QTabWidget#workbenchTabWidget::pane {
+    border: none;
+    background: #f6f3ed;
+}
+
+QTabWidget#workbenchTabWidget > QTabBar::tab {
+    background: #ede7dd;
+    color: #6b5d4d;
+    border: 1px solid #d8cfbf;
+    border-bottom: none;
+    padding: 6px 16px;
+    margin-right: 2px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    min-width: 80px;
+}
+
+QTabWidget#workbenchTabWidget > QTabBar::tab:selected {
+    background: #faf6ef;
+    color: #3d3529;
+    border-bottom: 2px solid #faf6ef;
+}
+
+QTabWidget#workbenchTabWidget > QTabBar::tab:hover:!selected {
+    background: #f5efe5;
+}
+
+QTabWidget#workbenchTabWidget > QTabBar::close-button {
+    image: none;
+    subcontrol-position: right;
+    padding: 2px;
+}
+
+QTabWidget#workbenchTabWidget > QTabBar::close-button:hover {
+    background: #e0d6c8;
+    border-radius: 3px;
+}

@@ -1,6 +1,8 @@
 #include "app/MainWindow.hpp"
 
+#include "app/HelpDocumentWidget.hpp"
 #include "app/NodeLibraryListWidget.hpp"
+#include "app/WorkbenchTabWidget.hpp"
 #include "inspector/InspectorPanel.hpp"
 #include "qtnodes/QtNodesEditorWidget.hpp"
 #include "registry/BuiltInNodeRegistry.hpp"
@@ -22,7 +24,9 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QStatusBar>
+#include <QTabBar>
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -62,7 +66,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _nodeLibraryList(nullptr)
     , _nodeLibrarySearchEdit(nullptr)
     , _inspectorPanel(nullptr)
+    , _tabWidget(nullptr)
     , _editorWidget(nullptr)
+    , _helpWidget(nullptr)
     , _selectionValidationSummaryLabel(nullptr)
     , _newAction(nullptr)
     , _openAction(nullptr)
@@ -87,6 +93,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _languageMenuAction(nullptr)
     , _languageChineseAction(nullptr)
     , _languageEnglishAction(nullptr)
+    , _helpMenu(nullptr)
+    , _helpAction(nullptr)
     , _languageToolButton(nullptr)
     , _currentWorkflowPath()
     , _currentSelectedNodeDisplayName()
@@ -105,6 +113,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _settingsMenu->setObjectName("settingsMenu");
     _languageMenu = _settingsMenu->addMenu(QString());
     _languageMenu->setObjectName("languageMenu");
+    _helpMenu = menuBar()->addMenu(QString());
+    _helpMenu->setObjectName("helpMenu");
+    _helpAction = new QAction(this);
+    _helpAction->setObjectName("helpAction");
 
     _primaryToolBar = addToolBar(QStringLiteral("Primary"));
     _primaryToolBar->setObjectName("primaryToolBar");
@@ -212,8 +224,14 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     addDockWidget(Qt::RightDockWidgetArea, _inspectorDock);
     _toggleInspectorAction->setChecked(true);
 
-    _editorWidget = new QtNodesEditorWidget(this);
-    setCentralWidget(_editorWidget);
+    _tabWidget = new WorkbenchTabWidget(this);
+    _editorWidget = new QtNodesEditorWidget(_tabWidget);
+    _helpWidget = nullptr;
+    _tabWidget->addTab(_editorWidget, tr("Workflow"));
+    _tabWidget->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr);
+    _tabWidget->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
+    setCentralWidget(_tabWidget);
+    connect(_tabWidget, &QTabWidget::currentChanged, this, &MainWindow::handleTabChanged);
     statusBar()->setObjectName("primaryStatusBar");
     _selectionValidationSummaryLabel = new QLabel(statusBar());
     _selectionValidationSummaryLabel->setObjectName("selectionValidationSummaryLabel");
@@ -376,6 +394,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_toggleInspectorAction, &QAction::toggled, _inspectorDock, &QDockWidget::setVisible);
     connect(_nodeLibraryDock, &QDockWidget::visibilityChanged, _toggleNodeLibraryAction, &QAction::setChecked);
     connect(_inspectorDock, &QDockWidget::visibilityChanged, _toggleInspectorAction, &QAction::setChecked);
+    connect(_helpAction, &QAction::triggered, this, &MainWindow::openHelpTab);
 
     if (_languageManager != nullptr) {
         connect(_languageManager, &LanguageManager::languageChanged, this, [this](LanguageManager::Language) {
@@ -517,6 +536,10 @@ void MainWindow::retranslateUi()
     _viewMenu->setTitle(tr("View"));
     _settingsMenu->setTitle(tr("Settings"));
     _languageMenu->setTitle(tr("Language"));
+    _helpMenu->setTitle(tr("Help"));
+    _helpAction->setText(tr("User Guide"));
+    _helpAction->setShortcut(QKeySequence::keyBindings(QKeySequence::HelpContents).value(0, QKeySequence(Qt::Key_F1)));
+    _tabWidget->setTabText(0, tr("Workflow"));
 
     _newAction->setText(tr("New"));
     _openAction->setText(tr("Open"));
@@ -607,6 +630,16 @@ void MainWindow::retranslateUi()
     _languageMenu->clear();
     _languageMenu->addAction(_languageChineseAction);
     _languageMenu->addAction(_languageEnglishAction);
+
+    _helpMenu->clear();
+    _helpMenu->addAction(_helpAction);
+
+    if (_helpWidget != nullptr) {
+        const int helpIndex = _tabWidget->indexOf(_helpWidget);
+        if (helpIndex >= 0)
+            _tabWidget->setTabText(helpIndex, tr("User Guide"));
+        _helpWidget->retranslateUi();
+    }
 
     updateWindowTitle();
     rebuildRecentFilesMenu();
@@ -781,4 +814,27 @@ void MainWindow::exportWorkflow(WorkflowExporter::Format format)
 
     file.write(result.code.toUtf8());
     statusBar()->showMessage(tr("Exported to %1").arg(filePath));
+}
+
+void MainWindow::openHelpTab()
+{
+    if (_helpWidget == nullptr) {
+        _helpWidget = new HelpDocumentWidget(_tabWidget);
+        connect(_helpWidget, &QObject::destroyed, this, [this]() { _helpWidget = nullptr; });
+        _tabWidget->addClosableTab(_helpWidget, tr("User Guide"));
+    } else {
+        _tabWidget->activateOrAddTab(_helpWidget, tr("User Guide"));
+    }
+}
+
+void MainWindow::handleTabChanged(int index)
+{
+    const bool isCanvas = (index == 0);
+    const QSignalBlocker inspectorBlocker(_inspectorDock);
+    const QSignalBlocker nodeLibraryBlocker(_nodeLibraryDock);
+
+    _inspectorDock->setVisible(isCanvas && _toggleInspectorAction->isChecked());
+    _nodeLibraryDock->setVisible(isCanvas && _toggleNodeLibraryAction->isChecked());
+    _toggleInspectorAction->setEnabled(isCanvas);
+    _toggleNodeLibraryAction->setEnabled(isCanvas);
 }

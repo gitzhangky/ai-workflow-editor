@@ -72,7 +72,7 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
    按类别列出可用节点。支持搜索、折叠分组、双击添加、拖拽到画布。
 
 3. 中间工作流画布  
-   用来摆放节点和连接节点。
+   作为中央工作区的 `工作流` 页签，用来摆放节点和连接节点。帮助文档等文本内容会在同一中央工作区中打开为新页签，不占用左右面板。
 
 4. 右侧 Inspector（属性面板）  
    选中节点后，在这里编辑名称、描述和该节点的类型专属配置。
@@ -387,6 +387,10 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 
 点击工具栏 `适配全图` 可以忽略当前选择，直接缩放并平移到完整工作流，适合节点很多、画布被拖远或需要快速查看全局结构时使用。
 
+### 用户指南页签
+
+点击菜单 `帮助 > 用户指南` 可以在中央工作区打开内置帮助文档。帮助文档会复用同一个页签；重复点击不会打开多个相同页面。打开帮助页时，左侧节点库和右侧 Inspector 会临时隐藏，切回 `工作流` 页签后会恢复原来的显示偏好。
+
 ### 搜索节点
 
 左侧节点库顶部有搜索框。
@@ -424,6 +428,7 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - `Delete`：`Delete`
 - `Center`：`Space`
 - `Fit Workflow`：`Command+0`
+- `User Guide`：`F1`
 
 在 macOS 上，通常分别对应：
 
