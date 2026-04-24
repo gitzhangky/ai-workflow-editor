@@ -2,13 +2,19 @@
 
 #include <QAbstractItemDelegate>
 #include <QDrag>
+#include <QEvent>
 #include <QFont>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QScrollBar>
+#include <QShowEvent>
 #include <QStyledItemDelegate>
+#include <QTimer>
 
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -181,17 +187,175 @@ public:
         return QSize(option.rect.width(), 56);
     }
 };
+
+class NodeLibraryScrollOverlay final : public QWidget
+{
+public:
+    explicit NodeLibraryScrollOverlay(QScrollBar *scrollBar, QWidget *parent = nullptr)
+        : QWidget(parent)
+        , _scrollBar(scrollBar)
+        , _thumbRect()
+        , _dragging(false)
+        , _dragOffset(0.0)
+    {
+        setObjectName(QStringLiteral("nodeLibraryScrollOverlay"));
+        setAttribute(Qt::WA_StyledBackground, false);
+        setMouseTracking(true);
+        hide();
+    }
+
+    void syncToScrollBar()
+    {
+        _thumbRect = thumbRectForValue();
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        if (_scrollBar == nullptr || _scrollBar->maximum() <= 0 || !_thumbRect.isValid())
+            return;
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+
+        const QRectF track = alignedRect(trackRect());
+        const QRectF thumb = alignedRect(_thumbRect);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(NodeLibraryListWidget::scrollIndicatorTrackColor());
+        painter.drawRoundedRect(track,
+                                NodeLibraryListWidget::scrollIndicatorCornerRadius(),
+                                NodeLibraryListWidget::scrollIndicatorCornerRadius());
+
+        painter.setBrush(NodeLibraryListWidget::scrollIndicatorThumbColor());
+        painter.drawRoundedRect(thumb,
+                                NodeLibraryListWidget::scrollIndicatorCornerRadius(),
+                                NodeLibraryListWidget::scrollIndicatorCornerRadius());
+    }
+
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (_scrollBar == nullptr || _scrollBar->maximum() <= 0) {
+            event->ignore();
+            return;
+        }
+
+        if (_thumbRect.contains(event->pos())) {
+            _dragging = true;
+            _dragOffset = event->localPos().y() - _thumbRect.top();
+        } else {
+            const qreal desiredTop = event->localPos().y() - (_thumbRect.height() / 2.0);
+            _dragOffset = _thumbRect.height() / 2.0;
+            _dragging = true;
+            _scrollBar->setValue(scrollValueForThumbTop(desiredTop));
+            syncToScrollBar();
+        }
+
+        event->accept();
+    }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        if (!_dragging || _scrollBar == nullptr) {
+            event->ignore();
+            return;
+        }
+
+        const qreal desiredTop = event->localPos().y() - _dragOffset;
+        _scrollBar->setValue(scrollValueForThumbTop(desiredTop));
+        syncToScrollBar();
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        _dragging = false;
+        event->accept();
+    }
+
+    void wheelEvent(QWheelEvent *event) override
+    {
+        event->ignore();
+    }
+
+private:
+    QRectF trackRect() const
+    {
+        constexpr qreal sideInset = 1.0;
+        constexpr qreal topInset = 1.0;
+        const QRectF rect = this->rect();
+        return rect.adjusted(sideInset, topInset, -sideInset, -topInset);
+    }
+
+    QRectF alignedRect(QRectF const &rect) const
+    {
+        return rect.adjusted(0.5, 0.5, -0.5, -0.5);
+    }
+
+    QRectF thumbRectForValue() const
+    {
+        const QRectF track = trackRect();
+        if (_scrollBar == nullptr || _scrollBar->maximum() <= 0 || track.height() <= 0.0)
+            return {};
+
+        const qreal documentExtent = static_cast<qreal>(_scrollBar->maximum() + _scrollBar->pageStep());
+        if (documentExtent <= 0.0)
+            return {};
+
+        const qreal thumbHeight =
+            std::clamp(track.height() * (static_cast<qreal>(_scrollBar->pageStep()) / documentExtent), 34.0, track.height());
+        const qreal travel = std::max(0.0, track.height() - thumbHeight);
+        const qreal ratio =
+            _scrollBar->maximum() > 0 ? static_cast<qreal>(_scrollBar->value()) / static_cast<qreal>(_scrollBar->maximum())
+                                      : 0.0;
+        return QRectF(track.left(), track.top() + (travel * ratio), track.width(), thumbHeight);
+    }
+
+    int scrollValueForThumbTop(qreal thumbTop) const
+    {
+        const QRectF track = trackRect();
+        if (_scrollBar == nullptr || _scrollBar->maximum() <= 0 || _thumbRect.height() <= 0.0)
+            return 0;
+
+        const qreal travel = std::max(0.0, track.height() - _thumbRect.height());
+        if (travel <= 0.0)
+            return 0;
+
+        const qreal clampedTop = std::clamp(thumbTop, track.top(), track.bottom() - _thumbRect.height());
+        const qreal ratio = (clampedTop - track.top()) / travel;
+        return static_cast<int>(std::lround(ratio * static_cast<qreal>(_scrollBar->maximum())));
+    }
+
+    QScrollBar *_scrollBar;
+    QRectF _thumbRect;
+    bool _dragging;
+    qreal _dragOffset;
+};
 }
 
 NodeLibraryListWidget::NodeLibraryListWidget(QWidget *parent)
     : QListWidget(parent)
     , _filterText()
+    , _scrollIndicator(new NodeLibraryScrollOverlay(verticalScrollBar(), this))
+    , _viewportHovered(false)
+    , _scrollIndicatorHovered(false)
 {
     setDragEnabled(true);
     setSelectionMode(QAbstractItemView::SingleSelection);
     setDefaultDropAction(Qt::CopyAction);
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setSpacing(0);
     setItemDelegate(new NodeLibraryItemDelegate(this));
+    viewport()->setMouseTracking(true);
+    viewport()->installEventFilter(this);
+    _scrollIndicator->installEventFilter(this);
+
+    connect(verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() { refreshScrollIndicator(); });
+    connect(verticalScrollBar(), &QScrollBar::rangeChanged, this, [this](int, int) { refreshScrollIndicator(); });
+
+    updateScrollIndicatorGeometry();
+    refreshScrollIndicator();
 }
 
 QPixmap NodeLibraryListWidget::dragPreviewPixmap()
@@ -206,6 +370,26 @@ QRectF NodeLibraryListWidget::alignedCardRect(QRectF const &rect)
     return rect.adjusted(0.5, 0.5, -0.5, -0.5);
 }
 
+int NodeLibraryListWidget::scrollIndicatorWidth()
+{
+    return 8;
+}
+
+qreal NodeLibraryListWidget::scrollIndicatorCornerRadius()
+{
+    return 4.0;
+}
+
+QColor NodeLibraryListWidget::scrollIndicatorTrackColor()
+{
+    return QColor(QStringLiteral("#f4eee5"));
+}
+
+QColor NodeLibraryListWidget::scrollIndicatorThumbColor()
+{
+    return QColor(QStringLiteral("#d7c1aa"));
+}
+
 QListWidgetItem *NodeLibraryListWidget::addSectionHeader(QString const &title, QIcon const &icon)
 {
     auto *item = new QListWidgetItem(icon, title, this);
@@ -215,6 +399,7 @@ QListWidgetItem *NodeLibraryListWidget::addSectionHeader(QString const &title, Q
     item->setData(SectionCollapsedRole, false);
     item->setData(CardVisualStateRole, static_cast<int>(CardVisualState::Standalone));
     item->setSizeHint(QSize(0, 40));
+    queueScrollIndicatorRefresh();
     return item;
 }
 
@@ -229,6 +414,7 @@ QListWidgetItem *NodeLibraryListWidget::addNodeEntry(QString const &typeKey,
     item->setToolTip(description);
     item->setData(CardVisualStateRole, static_cast<int>(CardVisualState::NodeBottom));
     item->setSizeHint(QSize(0, 56));
+    queueScrollIndicatorRefresh();
     return item;
 }
 
@@ -254,6 +440,49 @@ void NodeLibraryListWidget::toggleSection(QListWidgetItem *headerItem)
     applyVisibility();
 }
 
+bool NodeLibraryListWidget::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == viewport()) {
+        switch (event->type()) {
+        case QEvent::Enter:
+        case QEvent::MouseMove:
+            _viewportHovered = true;
+            queueScrollIndicatorRefresh();
+            break;
+        case QEvent::Leave:
+        case QEvent::Hide:
+            _viewportHovered = false;
+            queueScrollIndicatorRefresh();
+            break;
+        case QEvent::Show:
+            queueScrollIndicatorRefresh();
+            break;
+        default:
+            break;
+        }
+    } else if (watched == _scrollIndicator) {
+        switch (event->type()) {
+        case QEvent::Enter:
+        case QEvent::MouseMove:
+            _scrollIndicatorHovered = true;
+            queueScrollIndicatorRefresh();
+            break;
+        case QEvent::Leave:
+        case QEvent::Hide:
+            _scrollIndicatorHovered = false;
+            queueScrollIndicatorRefresh();
+            break;
+        case QEvent::Show:
+            queueScrollIndicatorRefresh();
+            break;
+        default:
+            break;
+        }
+    }
+
+    return QListWidget::eventFilter(watched, event);
+}
+
 QStringList NodeLibraryListWidget::mimeTypes() const
 {
     return {QString::fromUtf8(MimeType)};
@@ -275,6 +504,20 @@ QMimeData *NodeLibraryListWidget::mimeData(QList<QListWidgetItem *> items) const
 Qt::DropActions NodeLibraryListWidget::supportedDragActions() const
 {
     return Qt::CopyAction;
+}
+
+void NodeLibraryListWidget::resizeEvent(QResizeEvent *event)
+{
+    QListWidget::resizeEvent(event);
+    updateScrollIndicatorGeometry();
+    refreshScrollIndicator();
+}
+
+void NodeLibraryListWidget::showEvent(QShowEvent *event)
+{
+    QListWidget::showEvent(event);
+    updateScrollIndicatorGeometry();
+    queueScrollIndicatorRefresh();
 }
 
 void NodeLibraryListWidget::startDrag(Qt::DropActions)
@@ -371,4 +614,43 @@ void NodeLibraryListWidget::applyVisibility()
     }
 
     updateSectionCardStates(currentHeader, currentSectionNodes);
+    queueScrollIndicatorRefresh();
+}
+
+void NodeLibraryListWidget::queueScrollIndicatorRefresh()
+{
+    QTimer::singleShot(0, this, [this]() { refreshScrollIndicator(); });
+}
+
+void NodeLibraryListWidget::refreshScrollIndicator()
+{
+    updateScrollIndicatorGeometry();
+
+    if (_scrollIndicator == nullptr)
+        return;
+
+    const bool hasOverflow = verticalScrollBar()->maximum() > 0;
+    const bool hovered = _viewportHovered || _scrollIndicatorHovered;
+    const bool shouldShow = isVisible() && hasOverflow && hovered;
+
+    _scrollIndicator->setVisible(shouldShow);
+    _scrollIndicator->raise();
+    static_cast<NodeLibraryScrollOverlay *>(_scrollIndicator)->syncToScrollBar();
+}
+
+void NodeLibraryListWidget::updateScrollIndicatorGeometry()
+{
+    if (_scrollIndicator == nullptr)
+        return;
+
+    const QRect viewportRect = viewport()->geometry();
+    const int overlayWidth = scrollIndicatorWidth();
+    constexpr int rightInset = 6;
+    constexpr int verticalInset = 12;
+    const int overlayHeight = std::max(0, viewportRect.height() - (verticalInset * 2));
+    const int overlayLeft = viewportRect.right() - overlayWidth - rightInset + 1;
+    _scrollIndicator->setGeometry(overlayLeft,
+                                  viewportRect.top() + verticalInset,
+                                  overlayWidth,
+                                  overlayHeight);
 }

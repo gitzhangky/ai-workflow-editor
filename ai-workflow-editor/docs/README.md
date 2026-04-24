@@ -7,6 +7,7 @@
 1. `user-guide.md`
    - 界面说明
    - 第一个工作流怎么搭
+   - `Agent`、`聊天输出`、`JSON 转换` 等当前内置节点怎么配置
    - Inspector 怎么填
    - 校验提示怎么看
    - 保存 / 打开 / Undo / Redo 怎么用

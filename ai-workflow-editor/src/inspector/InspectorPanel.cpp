@@ -96,6 +96,18 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     , _llmTemperatureSpin(new QDoubleSpinBox(this))
     , _llmMaxTokensLabel(new QLabel(this))
     , _llmMaxTokensSpin(new QSpinBox(this))
+    , _agentSection(nullptr)
+    , _agentInstructionsLabel(new QLabel(this))
+    , _agentInstructionsEdit(new QTextEdit(this))
+    , _agentModelNameLabel(new QLabel(this))
+    , _agentModelNameEdit(new QLineEdit(this))
+    , _agentMaxIterationsLabel(new QLabel(this))
+    , _agentMaxIterationsSpin(new QSpinBox(this))
+    , _chatOutputSection(nullptr)
+    , _chatOutputRoleLabel(new QLabel(this))
+    , _chatOutputRoleEdit(new QLineEdit(this))
+    , _chatOutputTemplateLabel(new QLabel(this))
+    , _chatOutputTemplateEdit(new QTextEdit(this))
     , _memorySection(nullptr)
     , _memoryKeyLabel(new QLabel(this))
     , _memoryKeyEdit(new QLineEdit(this))
@@ -116,6 +128,9 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     , _httpRequestBodyEdit(new QTextEdit(this))
     , _httpRequestTimeoutLabel(new QLabel(this))
     , _httpRequestTimeoutSpin(new QSpinBox(this))
+    , _jsonTransformSection(nullptr)
+    , _jsonTransformLabel(new QLabel(this))
+    , _jsonTransformEdit(new QTextEdit(this))
     , _toolSection(nullptr)
     , _toolNameLabel(new QLabel(this))
     , _toolNameEdit(new QLineEdit(this))
@@ -181,6 +196,30 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     llmFormLayout->addRow(_llmTemperatureLabel, _llmTemperatureSpin);
     llmFormLayout->addRow(_llmMaxTokensLabel, _llmMaxTokensSpin);
 
+    _agentSection = createSectionWidget(this, layout);
+    _agentSection->setObjectName("inspectorAgentSection");
+    _agentInstructionsLabel->setObjectName("inspectorAgentInstructionsLabel");
+    _agentInstructionsEdit->setObjectName("inspectorAgentInstructionsEdit");
+    _agentModelNameLabel->setObjectName("inspectorAgentModelNameLabel");
+    _agentModelNameEdit->setObjectName("inspectorAgentModelNameEdit");
+    _agentMaxIterationsLabel->setObjectName("inspectorAgentMaxIterationsLabel");
+    _agentMaxIterationsSpin->setObjectName("inspectorAgentMaxIterationsSpin");
+    _agentMaxIterationsSpin->setRange(1, 50);
+    auto *agentFormLayout = qobject_cast<QFormLayout *>(_agentSection->layout());
+    agentFormLayout->addRow(_agentInstructionsLabel, _agentInstructionsEdit);
+    agentFormLayout->addRow(_agentModelNameLabel, _agentModelNameEdit);
+    agentFormLayout->addRow(_agentMaxIterationsLabel, _agentMaxIterationsSpin);
+
+    _chatOutputSection = createSectionWidget(this, layout);
+    _chatOutputSection->setObjectName("inspectorChatOutputSection");
+    _chatOutputRoleLabel->setObjectName("inspectorChatOutputRoleLabel");
+    _chatOutputRoleEdit->setObjectName("inspectorChatOutputRoleEdit");
+    _chatOutputTemplateLabel->setObjectName("inspectorChatOutputTemplateLabel");
+    _chatOutputTemplateEdit->setObjectName("inspectorChatOutputTemplateEdit");
+    auto *chatOutputFormLayout = qobject_cast<QFormLayout *>(_chatOutputSection->layout());
+    chatOutputFormLayout->addRow(_chatOutputRoleLabel, _chatOutputRoleEdit);
+    chatOutputFormLayout->addRow(_chatOutputTemplateLabel, _chatOutputTemplateEdit);
+
     _memorySection = createSectionWidget(this, layout);
     _memorySection->setObjectName("inspectorMemorySection");
     _memoryKeyLabel->setObjectName("inspectorMemoryKeyLabel");
@@ -222,6 +261,13 @@ InspectorPanel::InspectorPanel(QWidget *parent)
     httpRequestFormLayout->addRow(_httpRequestHeadersLabel, _httpRequestHeadersEdit);
     httpRequestFormLayout->addRow(_httpRequestBodyLabel, _httpRequestBodyEdit);
     httpRequestFormLayout->addRow(_httpRequestTimeoutLabel, _httpRequestTimeoutSpin);
+
+    _jsonTransformSection = createSectionWidget(this, layout);
+    _jsonTransformSection->setObjectName("inspectorJsonTransformSection");
+    _jsonTransformLabel->setObjectName("inspectorJsonTransformLabel");
+    _jsonTransformEdit->setObjectName("inspectorJsonTransformEdit");
+    auto *jsonTransformFormLayout = qobject_cast<QFormLayout *>(_jsonTransformSection->layout());
+    jsonTransformFormLayout->addRow(_jsonTransformLabel, _jsonTransformEdit);
 
     _toolSection = createSectionWidget(this, layout);
     _toolSection->setObjectName("inspectorToolSection");
@@ -454,7 +500,7 @@ void InspectorPanel::applyPropertyFieldValidationState(QString const &state,
         return;
 
     for (auto const &binding : _propertyFields) {
-        if (binding.schema.propertyKey != propertyKey)
+        if (binding.schema.propertyKey != propertyKey || binding.schema.typeKey != _currentTypeKey)
             continue;
 
         if (binding.label != nullptr) {

@@ -1,7 +1,9 @@
 <RCC>
   <qresource prefix="/app-theme">
     <file>icons/nodes/ai.svg</file>
+    <file>icons/nodes/agent.svg</file>
     <file>icons/nodes/condition.svg</file>
+    <file>icons/nodes/chatOutput.svg</file>
     <file>icons/nodes/flow.svg</file>
     <file>icons/nodes/integration.svg</file>
     <file>icons/nodes/llm.svg</file>
@@ -12,6 +14,7 @@
     <file>icons/nodes/start.svg</file>
     <file>icons/nodes/templateVariables.svg</file>
     <file>icons/nodes/httpRequest.svg</file>
+    <file>icons/nodes/jsonTransform.svg</file>
     <file>icons/nodes/tool.svg</file>
     <file>icons/toolbar/center.svg</file>
     <file>icons/toolbar/delete.svg</file>

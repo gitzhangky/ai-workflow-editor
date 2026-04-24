@@ -33,12 +33,17 @@ QColor headerColorFor(QtNodes::NodeStyle const &style, bool selected)
 QString badgeTextFor(QString const &typeKey)
 {
     if (typeKey == QStringLiteral("start") || typeKey == QStringLiteral("condition")
-        || typeKey == QStringLiteral("output")) {
+        || typeKey == QStringLiteral("chatOutput") || typeKey == QStringLiteral("output")) {
         return QStringLiteral("FLOW");
     }
 
-    if (typeKey == QStringLiteral("prompt") || typeKey == QStringLiteral("llm"))
+    if (typeKey == QStringLiteral("prompt") || typeKey == QStringLiteral("llm")
+        || typeKey == QStringLiteral("agent")) {
         return QStringLiteral("AI");
+    }
+
+    if (typeKey == QStringLiteral("jsonTransform"))
+        return QStringLiteral("JSON");
 
     if (typeKey == QStringLiteral("tool"))
         return QStringLiteral("TOOL");
@@ -48,8 +53,10 @@ QString badgeTextFor(QString const &typeKey)
 
 int hintLineCount(QString const &typeKey)
 {
-    if (typeKey == QStringLiteral("start") || typeKey == QStringLiteral("output"))
+    if (typeKey == QStringLiteral("start") || typeKey == QStringLiteral("chatOutput")
+        || typeKey == QStringLiteral("output")) {
         return 1;
+    }
 
     if (typeKey == QStringLiteral("condition"))
         return 2;

@@ -111,6 +111,9 @@ private slots:
     void showsTypeSpecificInspectorFieldsForRetriever();
     void showsTypeSpecificInspectorFieldsForTemplateVariables();
     void showsTypeSpecificInspectorFieldsForHttpRequest();
+    void showsTypeSpecificInspectorFieldsForJsonTransform();
+    void showsTypeSpecificInspectorFieldsForAgent();
+    void showsTypeSpecificInspectorFieldsForChatOutput();
     void exposesStableInspectorFieldMetadata();
     void exposesStableInspectorFieldHintMetadata();
     void exposesStableInspectorFieldSchemaObjectNames();
@@ -123,8 +126,11 @@ private slots:
     void marksIncompletePromptNodeWithWarningValidationState();
     void marksIncompleteMemoryNodeWithWarningValidationState();
     void marksIncompleteRetrieverNodeWithWarningValidationState();
+    void marksIncompleteAgentNodeWithWarningValidationState();
+    void marksIncompleteChatOutputNodeWithWarningValidationState();
     void marksInvalidTemplateVariablesNodeWithValidationState();
     void marksInvalidHttpRequestNodeWithValidationState();
+    void marksInvalidJsonTransformNodeWithValidationState();
     void marksInvalidToolNodeWithErrorValidationState();
     void marksFlowNodesWithStructuralWarningsBasedOnConnections();
     void showsValidationMessageInInspectorForSelectedNode();
@@ -143,6 +149,9 @@ private slots:
     void savesAndLoadsRetrieverNodeProperties();
     void savesAndLoadsTemplateVariablesNodeProperties();
     void savesAndLoadsHttpRequestNodeProperties();
+    void savesAndLoadsJsonTransformNodeProperties();
+    void savesAndLoadsAgentNodeProperties();
+    void savesAndLoadsChatOutputNodeProperties();
     void tracksDirtyStateOnEdits();
     void clearsDirtyStateOnSave();
     void clearsDirtyStateOnLoad();
@@ -201,7 +210,7 @@ void MainWindowTests::createsNodeLibraryAndInspectorDocks()
 
     auto *nodeLibrary = window.findChild<QListWidget *>("nodeLibraryList");
     QVERIFY(nodeLibrary != nullptr);
-    QCOMPARE(nodeLibrary->count(), 13);
+    QCOMPARE(nodeLibrary->count(), 16);
     QCOMPARE(nodeLibrary->item(1)->text(), QString::fromUtf8("开始"));
 }
 
@@ -446,6 +455,7 @@ void MainWindowTests::addsIconsToToolbarAndNodeLibrary()
     QVERIFY(!nodeLibrary->item(1)->icon().isNull());
     QVERIFY(!nodeLibrary->item(4)->icon().isNull());
     QVERIFY(!nodeLibrary->item(6)->icon().isNull());
+    QVERIFY(!nodeLibrary->item(12)->icon().isNull());
 }
 
 void MainWindowTests::groupsNodeLibraryIntoCategorySections()
@@ -456,22 +466,25 @@ void MainWindowTests::groupsNodeLibraryIntoCategorySections()
     auto *nodeLibrary = window.findChild<QListWidget *>("nodeLibraryList");
     QVERIFY(nodeLibrary != nullptr);
 
-    QCOMPARE(nodeLibrary->count(), 13);
+    QCOMPARE(nodeLibrary->count(), 16);
     QCOMPARE(nodeLibrary->item(0)->text(), QString::fromUtf8("流程"));
     QCOMPARE(nodeLibrary->item(0)->data(Qt::UserRole + 1).toString(), QString());
     QVERIFY(!(nodeLibrary->item(0)->flags() & Qt::ItemIsDragEnabled));
     QCOMPARE(nodeLibrary->item(1)->text(), QString::fromUtf8("开始"));
     QCOMPARE(nodeLibrary->item(2)->text(), QString::fromUtf8("条件"));
-    QCOMPARE(nodeLibrary->item(3)->text(), QString::fromUtf8("输出"));
-    QCOMPARE(nodeLibrary->item(4)->text(), QString::fromUtf8("AI"));
-    QCOMPARE(nodeLibrary->item(5)->text(), QString::fromUtf8("提示词"));
-    QCOMPARE(nodeLibrary->item(6)->text(), QString::fromUtf8("大模型"));
-    QCOMPARE(nodeLibrary->item(7)->text(), QString::fromUtf8("记忆"));
-    QCOMPARE(nodeLibrary->item(8)->text(), QString::fromUtf8("检索器"));
-    QCOMPARE(nodeLibrary->item(9)->text(), QString::fromUtf8("模板变量"));
-    QCOMPARE(nodeLibrary->item(10)->text(), QString::fromUtf8("集成"));
-    QCOMPARE(nodeLibrary->item(11)->text(), QString::fromUtf8("HTTP 请求"));
-    QCOMPARE(nodeLibrary->item(12)->text(), QString::fromUtf8("工具"));
+    QCOMPARE(nodeLibrary->item(3)->text(), QString::fromUtf8("聊天输出"));
+    QCOMPARE(nodeLibrary->item(4)->text(), QString::fromUtf8("输出"));
+    QCOMPARE(nodeLibrary->item(5)->text(), QString::fromUtf8("AI"));
+    QCOMPARE(nodeLibrary->item(6)->text(), QString::fromUtf8("提示词"));
+    QCOMPARE(nodeLibrary->item(7)->text(), QString::fromUtf8("大模型"));
+    QCOMPARE(nodeLibrary->item(8)->text(), QString::fromUtf8("Agent"));
+    QCOMPARE(nodeLibrary->item(9)->text(), QString::fromUtf8("记忆"));
+    QCOMPARE(nodeLibrary->item(10)->text(), QString::fromUtf8("检索器"));
+    QCOMPARE(nodeLibrary->item(11)->text(), QString::fromUtf8("模板变量"));
+    QCOMPARE(nodeLibrary->item(12)->text(), QString::fromUtf8("集成"));
+    QCOMPARE(nodeLibrary->item(13)->text(), QString::fromUtf8("HTTP 请求"));
+    QCOMPARE(nodeLibrary->item(14)->text(), QString::fromUtf8("JSON 转换"));
+    QCOMPARE(nodeLibrary->item(15)->text(), QString::fromUtf8("工具"));
 }
 
 void MainWindowTests::addsSearchBoxForNodeLibraryFiltering()
@@ -489,9 +502,9 @@ void MainWindowTests::addsSearchBoxForNodeLibraryFiltering()
     searchEdit->setText(QString::fromUtf8("提示"));
 
     QVERIFY(nodeLibrary->item(0)->isHidden());
-    QVERIFY(!nodeLibrary->item(4)->isHidden());
     QVERIFY(!nodeLibrary->item(5)->isHidden());
-    QVERIFY(nodeLibrary->item(6)->isHidden());
+    QVERIFY(!nodeLibrary->item(6)->isHidden());
+    QVERIFY(nodeLibrary->item(7)->isHidden());
 }
 
 void MainWindowTests::addsNodeToCanvasFromLibraryAction()
@@ -626,9 +639,12 @@ void MainWindowTests::showsTypeSpecificInspectorFieldsForPromptLlmAndTool()
     auto *llmModelEdit = window.findChild<QLineEdit *>("inspectorLlmModelNameEdit");
     auto *llmTemperatureSpin = window.findChild<QDoubleSpinBox *>("inspectorLlmTemperatureSpin");
     auto *llmMaxTokensSpin = window.findChild<QSpinBox *>("inspectorLlmMaxTokensSpin");
+    auto *jsonTransformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
     auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
     auto *toolTimeoutSpin = window.findChild<QSpinBox *>("inspectorToolTimeoutSpin");
     auto *toolInputMappingEdit = window.findChild<QTextEdit *>("inspectorToolInputMappingEdit");
+    auto *chatOutputRoleEdit = window.findChild<QLineEdit *>("inspectorChatOutputRoleEdit");
+    auto *chatOutputTemplateEdit = window.findChild<QTextEdit *>("inspectorChatOutputTemplateEdit");
 
     QVERIFY(editor != nullptr);
     QVERIFY(promptSystemEdit != nullptr);
@@ -636,6 +652,7 @@ void MainWindowTests::showsTypeSpecificInspectorFieldsForPromptLlmAndTool()
     QVERIFY(llmModelEdit != nullptr);
     QVERIFY(llmTemperatureSpin != nullptr);
     QVERIFY(llmMaxTokensSpin != nullptr);
+    QVERIFY(jsonTransformEdit != nullptr);
     QVERIFY(toolNameEdit != nullptr);
     QVERIFY(toolTimeoutSpin != nullptr);
     QVERIFY(toolInputMappingEdit != nullptr);
@@ -817,6 +834,109 @@ void MainWindowTests::showsTypeSpecificInspectorFieldsForHttpRequest()
     QCOMPARE(editor->selectedNodeProperty("timeoutMs").toInt(), 45000);
 }
 
+void MainWindowTests::showsTypeSpecificInspectorFieldsForJsonTransform()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *transformLabel = window.findChild<QLabel *>("inspectorJsonTransformLabel");
+    auto *transformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(transformLabel != nullptr);
+    QVERIFY(transformEdit != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto jsonTransformNode = editor->createNode("jsonTransform");
+    editor->selectNode(jsonTransformNode);
+
+    QVERIFY(transformLabel->isVisibleTo(&window));
+    QVERIFY(transformEdit->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    transformEdit->setPlainText("{\"summary\": \"{{http.response.summary}}\"}");
+    QCOMPARE(editor->selectedNodeProperty("transformJson").toString(),
+             QString("{\"summary\": \"{{http.response.summary}}\"}"));
+}
+
+void MainWindowTests::showsTypeSpecificInspectorFieldsForAgent()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *instructionsLabel = window.findChild<QLabel *>("inspectorAgentInstructionsLabel");
+    auto *instructionsEdit = window.findChild<QTextEdit *>("inspectorAgentInstructionsEdit");
+    auto *modelNameLabel = window.findChild<QLabel *>("inspectorAgentModelNameLabel");
+    auto *modelNameEdit = window.findChild<QLineEdit *>("inspectorAgentModelNameEdit");
+    auto *maxIterationsSpin = window.findChild<QSpinBox *>("inspectorAgentMaxIterationsSpin");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(instructionsLabel != nullptr);
+    QVERIFY(instructionsEdit != nullptr);
+    QVERIFY(modelNameLabel != nullptr);
+    QVERIFY(modelNameEdit != nullptr);
+    QVERIFY(maxIterationsSpin != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto agentNode = editor->createNode("agent");
+    editor->selectNode(agentNode);
+
+    QVERIFY(instructionsLabel->isVisibleTo(&window));
+    QVERIFY(instructionsEdit->isVisibleTo(&window));
+    QVERIFY(modelNameLabel->isVisibleTo(&window));
+    QVERIFY(modelNameEdit->isVisibleTo(&window));
+    QVERIFY(maxIterationsSpin->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    instructionsEdit->setPlainText("Use tools when necessary and produce a final answer.");
+    modelNameEdit->setText("gpt-5.4");
+    maxIterationsSpin->setValue(8);
+
+    QCOMPARE(editor->selectedNodeProperty("agentInstructions").toString(),
+             QString("Use tools when necessary and produce a final answer."));
+    QCOMPARE(editor->selectedNodeProperty("modelName").toString(), QString("gpt-5.4"));
+    QCOMPARE(editor->selectedNodeProperty("maxIterations").toInt(), 8);
+}
+
+void MainWindowTests::showsTypeSpecificInspectorFieldsForChatOutput()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *roleLabel = window.findChild<QLabel *>("inspectorChatOutputRoleLabel");
+    auto *roleEdit = window.findChild<QLineEdit *>("inspectorChatOutputRoleEdit");
+    auto *templateLabel = window.findChild<QLabel *>("inspectorChatOutputTemplateLabel");
+    auto *templateEdit = window.findChild<QTextEdit *>("inspectorChatOutputTemplateEdit");
+    auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
+
+    QVERIFY(editor != nullptr);
+    QVERIFY(roleLabel != nullptr);
+    QVERIFY(roleEdit != nullptr);
+    QVERIFY(templateLabel != nullptr);
+    QVERIFY(templateEdit != nullptr);
+    QVERIFY(toolNameEdit != nullptr);
+
+    const auto chatOutputNode = editor->createNode("chatOutput");
+    editor->selectNode(chatOutputNode);
+
+    QVERIFY(roleLabel->isVisibleTo(&window));
+    QVERIFY(roleEdit->isVisibleTo(&window));
+    QVERIFY(templateLabel->isVisibleTo(&window));
+    QVERIFY(templateEdit->isVisibleTo(&window));
+    QVERIFY(!toolNameEdit->isVisibleTo(&window));
+
+    roleEdit->setText("assistant");
+    templateEdit->setPlainText("{{agent.final_answer}}");
+
+    QCOMPARE(editor->selectedNodeProperty("messageRole").toString(), QString("assistant"));
+    QCOMPARE(editor->selectedNodeProperty("messageTemplate").toString(), QString("{{agent.final_answer}}"));
+}
+
 void MainWindowTests::exposesStableInspectorFieldMetadata()
 {
     LanguageManager languageManager;
@@ -827,18 +947,30 @@ void MainWindowTests::exposesStableInspectorFieldMetadata()
     auto *llmModelEdit = window.findChild<QLineEdit *>("inspectorLlmModelNameEdit");
     auto *llmTemperatureSpin = window.findChild<QDoubleSpinBox *>("inspectorLlmTemperatureSpin");
     auto *llmMaxTokensSpin = window.findChild<QSpinBox *>("inspectorLlmMaxTokensSpin");
+    auto *jsonTransformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
     auto *toolNameEdit = window.findChild<QLineEdit *>("inspectorToolNameEdit");
     auto *toolTimeoutSpin = window.findChild<QSpinBox *>("inspectorToolTimeoutSpin");
     auto *toolInputMappingEdit = window.findChild<QTextEdit *>("inspectorToolInputMappingEdit");
+    auto *chatOutputRoleEdit = window.findChild<QLineEdit *>("inspectorChatOutputRoleEdit");
+    auto *chatOutputTemplateEdit = window.findChild<QTextEdit *>("inspectorChatOutputTemplateEdit");
 
     QVERIFY(promptSystemEdit != nullptr);
     QVERIFY(promptUserEdit != nullptr);
     QVERIFY(llmModelEdit != nullptr);
     QVERIFY(llmTemperatureSpin != nullptr);
     QVERIFY(llmMaxTokensSpin != nullptr);
+    QVERIFY(jsonTransformEdit != nullptr);
+    auto *agentInstructionsEdit = window.findChild<QTextEdit *>("inspectorAgentInstructionsEdit");
+    auto *agentModelEdit = window.findChild<QLineEdit *>("inspectorAgentModelNameEdit");
+    auto *agentMaxIterationsSpin = window.findChild<QSpinBox *>("inspectorAgentMaxIterationsSpin");
     QVERIFY(toolNameEdit != nullptr);
     QVERIFY(toolTimeoutSpin != nullptr);
     QVERIFY(toolInputMappingEdit != nullptr);
+    QVERIFY(agentInstructionsEdit != nullptr);
+    QVERIFY(agentModelEdit != nullptr);
+    QVERIFY(agentMaxIterationsSpin != nullptr);
+    QVERIFY(chatOutputRoleEdit != nullptr);
+    QVERIFY(chatOutputTemplateEdit != nullptr);
 
     QCOMPARE(promptSystemEdit->property("inspectorPropertyKey").toString(), QString("systemPrompt"));
     QCOMPARE(promptSystemEdit->property("inspectorTypeKey").toString(), QString("prompt"));
@@ -850,6 +982,18 @@ void MainWindowTests::exposesStableInspectorFieldMetadata()
     QCOMPARE(llmTemperatureSpin->property("inspectorTypeKey").toString(), QString("llm"));
     QCOMPARE(llmMaxTokensSpin->property("inspectorPropertyKey").toString(), QString("maxTokens"));
     QCOMPARE(llmMaxTokensSpin->property("inspectorTypeKey").toString(), QString("llm"));
+    QCOMPARE(agentInstructionsEdit->property("inspectorPropertyKey").toString(), QString("agentInstructions"));
+    QCOMPARE(agentInstructionsEdit->property("inspectorTypeKey").toString(), QString("agent"));
+    QCOMPARE(agentModelEdit->property("inspectorPropertyKey").toString(), QString("modelName"));
+    QCOMPARE(agentModelEdit->property("inspectorTypeKey").toString(), QString("agent"));
+    QCOMPARE(agentMaxIterationsSpin->property("inspectorPropertyKey").toString(), QString("maxIterations"));
+    QCOMPARE(agentMaxIterationsSpin->property("inspectorTypeKey").toString(), QString("agent"));
+    QCOMPARE(chatOutputRoleEdit->property("inspectorPropertyKey").toString(), QString("messageRole"));
+    QCOMPARE(chatOutputRoleEdit->property("inspectorTypeKey").toString(), QString("chatOutput"));
+    QCOMPARE(chatOutputTemplateEdit->property("inspectorPropertyKey").toString(), QString("messageTemplate"));
+    QCOMPARE(chatOutputTemplateEdit->property("inspectorTypeKey").toString(), QString("chatOutput"));
+    QCOMPARE(jsonTransformEdit->property("inspectorPropertyKey").toString(), QString("transformJson"));
+    QCOMPARE(jsonTransformEdit->property("inspectorTypeKey").toString(), QString("jsonTransform"));
     QCOMPARE(toolNameEdit->property("inspectorPropertyKey").toString(), QString("toolName"));
     QCOMPARE(toolNameEdit->property("inspectorTypeKey").toString(), QString("tool"));
     QCOMPARE(toolTimeoutSpin->property("inspectorPropertyKey").toString(), QString("timeoutMs"));
@@ -865,11 +1009,21 @@ void MainWindowTests::exposesStableInspectorFieldHintMetadata()
 
     auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
     auto *llmModelEdit = window.findChild<QLineEdit *>("inspectorLlmModelNameEdit");
+    auto *jsonTransformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
     auto *toolInputMappingEdit = window.findChild<QTextEdit *>("inspectorToolInputMappingEdit");
+    auto *chatOutputRoleEdit = window.findChild<QLineEdit *>("inspectorChatOutputRoleEdit");
+    auto *chatOutputTemplateEdit = window.findChild<QTextEdit *>("inspectorChatOutputTemplateEdit");
 
     QVERIFY(promptUserEdit != nullptr);
     QVERIFY(llmModelEdit != nullptr);
+    auto *agentInstructionsEdit = window.findChild<QTextEdit *>("inspectorAgentInstructionsEdit");
+    auto *agentModelEdit = window.findChild<QLineEdit *>("inspectorAgentModelNameEdit");
+    QVERIFY(jsonTransformEdit != nullptr);
     QVERIFY(toolInputMappingEdit != nullptr);
+    QVERIFY(agentInstructionsEdit != nullptr);
+    QVERIFY(agentModelEdit != nullptr);
+    QVERIFY(chatOutputRoleEdit != nullptr);
+    QVERIFY(chatOutputTemplateEdit != nullptr);
 
     QCOMPARE(promptUserEdit->property("inspectorPlaceholderTextSource").toString(),
              QString("Example: Summarize the following content: {{input}}"));
@@ -879,6 +1033,26 @@ void MainWindowTests::exposesStableInspectorFieldHintMetadata()
              QString("Enter model identifier"));
     QCOMPARE(llmModelEdit->property("inspectorHelpTextSource").toString(),
              QString("Required. Use the model identifier configured by your runtime/backend."));
+    QCOMPARE(agentInstructionsEdit->property("inspectorPlaceholderTextSource").toString(),
+             QString("Example: Triage the request, decide whether to call tools, then summarize the result."));
+    QCOMPARE(agentInstructionsEdit->property("inspectorHelpTextSource").toString(),
+             QString("Required. Describes how this agent should reason, when it should use tools, and what it should return."));
+    QCOMPARE(agentModelEdit->property("inspectorPlaceholderTextSource").toString(),
+             QString("Example: gpt-5.4"));
+    QCOMPARE(agentModelEdit->property("inspectorHelpTextSource").toString(),
+             QString("Required. Choose the model that powers this agent node."));
+    QCOMPARE(chatOutputRoleEdit->property("inspectorPlaceholderTextSource").toString(),
+             QString("Example: assistant"));
+    QCOMPARE(chatOutputRoleEdit->property("inspectorHelpTextSource").toString(),
+             QString("Optional. Labels the chat speaker role for this output message."));
+    QCOMPARE(chatOutputTemplateEdit->property("inspectorPlaceholderTextSource").toString(),
+             QString("Example: {{agent.final_answer}}"));
+    QCOMPARE(chatOutputTemplateEdit->property("inspectorHelpTextSource").toString(),
+             QString("Required. Template text for the final chat message emitted by this workflow."));
+    QCOMPARE(jsonTransformEdit->property("inspectorPlaceholderTextSource").toString(),
+             QString("Example: {\"summary\": \"{{http.response.summary}}\"}"));
+    QCOMPARE(jsonTransformEdit->property("inspectorHelpTextSource").toString(),
+             QString("Required. Provide a JSON object that reshapes workflow data into a new object."));
     QCOMPARE(toolInputMappingEdit->property("inspectorPlaceholderTextSource").toString(),
              QString("Example: {\"query\": \"{{input}}\"}"));
     QCOMPARE(toolInputMappingEdit->property("inspectorHelpTextSource").toString(),
@@ -912,7 +1086,7 @@ void MainWindowTests::exposesStableInspectorFieldSchemaObjectNames()
 void MainWindowTests::exposesStableInspectorSectionSchemaObjectNames()
 {
     const auto schemas = builtInInspectorSectionSchemas();
-    QCOMPARE(schemas.size(), 10);
+    QCOMPARE(schemas.size(), 13);
 
     QSet<QString> uniqueTypeKeys;
     for (auto const &schema : schemas) {
@@ -922,10 +1096,13 @@ void MainWindowTests::exposesStableInspectorSectionSchemaObjectNames()
         QVERIFY(!uniqueTypeKeys.contains(schema.typeKey));
         uniqueTypeKeys.insert(schema.typeKey);
         if (schema.typeKey == QStringLiteral("prompt") || schema.typeKey == QStringLiteral("llm")
+            || schema.typeKey == QStringLiteral("agent")
+            || schema.typeKey == QStringLiteral("chatOutput")
             || schema.typeKey == QStringLiteral("memory")
             || schema.typeKey == QStringLiteral("retriever")
             || schema.typeKey == QStringLiteral("templateVariables")
             || schema.typeKey == QStringLiteral("httpRequest")
+            || schema.typeKey == QStringLiteral("jsonTransform")
             || schema.typeKey == QStringLiteral("tool")) {
             QVERIFY(!schema.sectionObjectName.isEmpty());
         }
@@ -959,6 +1136,12 @@ void MainWindowTests::exposesStableInspectorSectionSchemaCopy()
     auto const httpRequestSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
         return schema.typeKey == QStringLiteral("httpRequest");
     });
+    auto const jsonTransformSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("jsonTransform");
+    });
+    auto const chatOutputSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
+        return schema.typeKey == QStringLiteral("chatOutput");
+    });
     auto const outputSchema = std::find_if(schemas.cbegin(), schemas.cend(), [](InspectorSectionSchema const &schema) {
         return schema.typeKey == QStringLiteral("output");
     });
@@ -968,6 +1151,8 @@ void MainWindowTests::exposesStableInspectorSectionSchemaCopy()
     QVERIFY(retrieverSchema != schemas.cend());
     QVERIFY(templateVariablesSchema != schemas.cend());
     QVERIFY(httpRequestSchema != schemas.cend());
+    QVERIFY(jsonTransformSchema != schemas.cend());
+    QVERIFY(chatOutputSchema != schemas.cend());
     QVERIFY(outputSchema != schemas.cend());
 
     QCOMPARE(promptSchema->summaryText, QStringLiteral("Edit the prompt template and runtime text for this node."));
@@ -985,6 +1170,12 @@ void MainWindowTests::exposesStableInspectorSectionSchemaCopy()
     QCOMPARE(httpRequestSchema->displayName, QStringLiteral("HTTP Request"));
     QCOMPARE(httpRequestSchema->sectionTitle, QStringLiteral("HTTP Request Settings"));
     QVERIFY(!httpRequestSchema->showsEmptyState);
+    QCOMPARE(jsonTransformSchema->displayName, QStringLiteral("JSON Transform"));
+    QCOMPARE(jsonTransformSchema->sectionTitle, QStringLiteral("JSON Transform Settings"));
+    QVERIFY(!jsonTransformSchema->showsEmptyState);
+    QCOMPARE(chatOutputSchema->displayName, QStringLiteral("Chat Output"));
+    QCOMPARE(chatOutputSchema->sectionTitle, QStringLiteral("Chat Output Settings"));
+    QVERIFY(!chatOutputSchema->showsEmptyState);
     QCOMPARE(outputSchema->displayName, QStringLiteral("Output"));
     QCOMPARE(outputSchema->sectionTitle, QStringLiteral("General Settings"));
     QCOMPARE(outputSchema->summaryText, QStringLiteral("This node represents the workflow result."));
@@ -1002,6 +1193,7 @@ void MainWindowTests::retranslatesInspectorFieldLabelsAtRuntime()
     auto *llmModelNameLabel = window.findChild<QLabel *>("inspectorLlmModelNameLabel");
     auto *llmTemperatureLabel = window.findChild<QLabel *>("inspectorLlmTemperatureLabel");
     auto *llmMaxTokensLabel = window.findChild<QLabel *>("inspectorLlmMaxTokensLabel");
+    auto *jsonTransformLabel = window.findChild<QLabel *>("inspectorJsonTransformLabel");
     auto *toolNameLabel = window.findChild<QLabel *>("inspectorToolNameLabel");
     auto *toolTimeoutLabel = window.findChild<QLabel *>("inspectorToolTimeoutLabel");
     auto *toolInputMappingLabel = window.findChild<QLabel *>("inspectorToolInputMappingLabel");
@@ -1011,6 +1203,7 @@ void MainWindowTests::retranslatesInspectorFieldLabelsAtRuntime()
     QVERIFY(llmModelNameLabel != nullptr);
     QVERIFY(llmTemperatureLabel != nullptr);
     QVERIFY(llmMaxTokensLabel != nullptr);
+    QVERIFY(jsonTransformLabel != nullptr);
     QVERIFY(toolNameLabel != nullptr);
     QVERIFY(toolTimeoutLabel != nullptr);
     QVERIFY(toolInputMappingLabel != nullptr);
@@ -1020,6 +1213,7 @@ void MainWindowTests::retranslatesInspectorFieldLabelsAtRuntime()
     QCOMPARE(llmModelNameLabel->text(), QString::fromUtf8("模型名称"));
     QCOMPARE(llmTemperatureLabel->text(), QString::fromUtf8("温度"));
     QCOMPARE(llmMaxTokensLabel->text(), QString::fromUtf8("最大令牌数"));
+    QCOMPARE(jsonTransformLabel->text(), QString::fromUtf8("转换 JSON"));
     QCOMPARE(toolNameLabel->text(), QString::fromUtf8("工具名称"));
     QCOMPARE(toolTimeoutLabel->text(), QString::fromUtf8("超时（毫秒）"));
     QCOMPARE(toolInputMappingLabel->text(), QString::fromUtf8("输入映射"));
@@ -1031,6 +1225,7 @@ void MainWindowTests::retranslatesInspectorFieldLabelsAtRuntime()
     QCOMPARE(llmModelNameLabel->text(), QString("Model Name"));
     QCOMPARE(llmTemperatureLabel->text(), QString("Temperature"));
     QCOMPARE(llmMaxTokensLabel->text(), QString("Max Tokens"));
+    QCOMPARE(jsonTransformLabel->text(), QString("Transform JSON"));
     QCOMPARE(toolNameLabel->text(), QString("Tool Name"));
     QCOMPARE(toolTimeoutLabel->text(), QString("Timeout (ms)"));
     QCOMPARE(toolInputMappingLabel->text(), QString("Input Mapping"));
@@ -1044,16 +1239,20 @@ void MainWindowTests::retranslatesInspectorFieldHintsAtRuntime()
     auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
     auto *llmModelEdit = window.findChild<QLineEdit *>("inspectorLlmModelNameEdit");
     auto *llmTemperatureSpin = window.findChild<QDoubleSpinBox *>("inspectorLlmTemperatureSpin");
+    auto *jsonTransformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
     auto *toolInputMappingEdit = window.findChild<QTextEdit *>("inspectorToolInputMappingEdit");
 
     QVERIFY(promptUserEdit != nullptr);
     QVERIFY(llmModelEdit != nullptr);
     QVERIFY(llmTemperatureSpin != nullptr);
+    QVERIFY(jsonTransformEdit != nullptr);
     QVERIFY(toolInputMappingEdit != nullptr);
 
     QCOMPARE(promptUserEdit->placeholderText(), QString::fromUtf8("例如：总结以下内容：{{input}}"));
     QCOMPARE(llmModelEdit->placeholderText(), QString::fromUtf8("输入模型标识"));
     QCOMPARE(llmTemperatureSpin->toolTip(), QString::fromUtf8("较低的温度更稳定，较高的温度更发散。"));
+    QCOMPARE(jsonTransformEdit->placeholderText(), QString::fromUtf8("例如：{\"summary\": \"{{http.response.summary}}\"}"));
+    QCOMPARE(jsonTransformEdit->toolTip(), QString::fromUtf8("必填。填写 JSON 对象，把工作流数据重组为新的对象。"));
     QCOMPARE(toolInputMappingEdit->placeholderText(), QString::fromUtf8("例如：{\"query\": \"{{input}}\"}"));
     QCOMPARE(toolInputMappingEdit->toolTip(), QString::fromUtf8("可选。填写 JSON 对象，将工作流变量映射到工具输入。"));
 
@@ -1063,6 +1262,9 @@ void MainWindowTests::retranslatesInspectorFieldHintsAtRuntime()
     QCOMPARE(llmModelEdit->placeholderText(), QString("Enter model identifier"));
     QCOMPARE(llmTemperatureSpin->toolTip(),
              QString("Lower temperatures are more deterministic; higher temperatures are more creative."));
+    QCOMPARE(jsonTransformEdit->placeholderText(), QString("Example: {\"summary\": \"{{http.response.summary}}\"}"));
+    QCOMPARE(jsonTransformEdit->toolTip(),
+             QString("Required. Provide a JSON object that reshapes workflow data into a new object."));
     QCOMPARE(toolInputMappingEdit->placeholderText(), QString("Example: {\"query\": \"{{input}}\"}"));
     QCOMPARE(toolInputMappingEdit->toolTip(),
              QString("Optional. Provide a JSON object that maps workflow values into tool inputs."));
@@ -1225,6 +1427,87 @@ void MainWindowTests::marksIncompleteRetrieverNodeWithWarningValidationState()
     QCOMPARE(retrieverKeyEdit->property("validationState").toString(), QString());
 }
 
+void MainWindowTests::marksIncompleteAgentNodeWithWarningValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *instructionsLabel = window.findChild<QLabel *>("inspectorAgentInstructionsLabel");
+    auto *instructionsEdit = window.findChild<QTextEdit *>("inspectorAgentInstructionsEdit");
+    auto *modelNameLabel = window.findChild<QLabel *>("inspectorAgentModelNameLabel");
+    auto *modelNameEdit = window.findChild<QLineEdit *>("inspectorAgentModelNameEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(instructionsLabel != nullptr);
+    QVERIFY(instructionsEdit != nullptr);
+    QVERIFY(modelNameLabel != nullptr);
+    QVERIFY(modelNameEdit != nullptr);
+
+    const auto agentNode = editor->createNode("agent");
+    editor->selectNode(agentNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("Agent 指令不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("Agent 指令不能为空")));
+    QCOMPARE(instructionsLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(instructionsEdit->property("validationState").toString(), QString("warning"));
+
+    instructionsEdit->setPlainText("Plan and answer using available tools when needed.");
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("Agent 模型名称不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("Agent 模型名称不能为空")));
+    QCOMPARE(modelNameLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(modelNameEdit->property("validationState").toString(), QString("warning"));
+
+    modelNameEdit->setText("gpt-5.4");
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(instructionsLabel->property("validationState").toString(), QString());
+    QCOMPARE(instructionsEdit->property("validationState").toString(), QString());
+    QCOMPARE(modelNameLabel->property("validationState").toString(), QString());
+    QCOMPARE(modelNameEdit->property("validationState").toString(), QString());
+    QCOMPARE(editor->nodeValidationState(agentNode), QString("valid"));
+}
+
+void MainWindowTests::marksIncompleteChatOutputNodeWithWarningValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *templateLabel = window.findChild<QLabel *>("inspectorChatOutputTemplateLabel");
+    auto *templateEdit = window.findChild<QTextEdit *>("inspectorChatOutputTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(templateLabel != nullptr);
+    QVERIFY(templateEdit != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto chatOutputNode = editor->createNode("chatOutput");
+    editor->selectNode(chatOutputNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("聊天输出模板不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("聊天输出模板不能为空")));
+    QCOMPARE(templateLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(templateEdit->property("validationState").toString(), QString("warning"));
+
+    templateEdit->setPlainText("{{agent.final_answer}}");
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("聊天输出节点需要输入连接。"));
+    QCOMPARE(templateLabel->property("validationState").toString(), QString());
+    QCOMPARE(templateEdit->property("validationState").toString(), QString());
+
+    QVERIFY(editor->connectNodes(startNode, 0, chatOutputNode, 0));
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(editor->nodeValidationState(chatOutputNode), QString("valid"));
+}
+
 void MainWindowTests::marksInvalidTemplateVariablesNodeWithValidationState()
 {
     LanguageManager languageManager;
@@ -1304,6 +1587,44 @@ void MainWindowTests::marksInvalidHttpRequestNodeWithValidationState()
     QVERIFY(validationLabel->isHidden());
     QCOMPARE(headersLabel->property("validationState").toString(), QString());
     QCOMPARE(headersEdit->property("validationState").toString(), QString());
+}
+
+void MainWindowTests::marksInvalidJsonTransformNodeWithValidationState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *validationLabel = window.findChild<QLabel *>("inspectorValidationLabel");
+    auto *summaryLabel = window.findChild<QLabel *>("selectionValidationSummaryLabel");
+    auto *transformLabel = window.findChild<QLabel *>("inspectorJsonTransformLabel");
+    auto *transformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(validationLabel != nullptr);
+    QVERIFY(summaryLabel != nullptr);
+    QVERIFY(transformLabel != nullptr);
+    QVERIFY(transformEdit != nullptr);
+
+    const auto jsonTransformNode = editor->createNode("jsonTransform");
+    editor->selectNode(jsonTransformNode);
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("转换 JSON 不能为空。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("转换 JSON 不能为空")));
+    QCOMPARE(transformLabel->property("validationState").toString(), QString("warning"));
+    QCOMPARE(transformEdit->property("validationState").toString(), QString("warning"));
+
+    transformEdit->setPlainText("{bad json}");
+
+    QCOMPARE(validationLabel->text(), QString::fromUtf8("转换 JSON 必须是合法的 JSON 对象。"));
+    QVERIFY(summaryLabel->text().contains(QString::fromUtf8("转换 JSON 必须是合法的 JSON 对象")));
+    QCOMPARE(transformLabel->property("validationState").toString(), QString("error"));
+    QCOMPARE(transformEdit->property("validationState").toString(), QString("error"));
+
+    transformEdit->setPlainText("{\"summary\": \"{{http.response.summary}}\"}");
+
+    QVERIFY(validationLabel->isHidden());
+    QCOMPARE(transformLabel->property("validationState").toString(), QString());
+    QCOMPARE(transformEdit->property("validationState").toString(), QString());
 }
 
 void MainWindowTests::marksInvalidToolNodeWithErrorValidationState()
@@ -1937,6 +2258,116 @@ void MainWindowTests::savesAndLoadsHttpRequestNodeProperties()
              QString("{\"Authorization\": \"Bearer {{token}}\"}"));
     QCOMPARE(restoredEditor->selectedNodeProperty("bodyTemplate").toString(), QString("{\"query\": \"{{input}}\"}"));
     QCOMPARE(restoredEditor->selectedNodeProperty("timeoutMs").toInt(), 45000);
+}
+
+void MainWindowTests::savesAndLoadsJsonTransformNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("json-transform-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *transformEdit = window.findChild<QTextEdit *>("inspectorJsonTransformEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(transformEdit != nullptr);
+
+    const auto jsonTransformNode = editor->createNode("jsonTransform");
+    editor->selectNode(jsonTransformNode);
+    transformEdit->setPlainText("{\"summary\": \"{{http.response.summary}}\"}");
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredJsonTransformNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("JSON 转换"));
+    QVERIFY(restoredJsonTransformNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredJsonTransformNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("transformJson").toString(),
+             QString("{\"summary\": \"{{http.response.summary}}\"}"));
+}
+
+void MainWindowTests::savesAndLoadsAgentNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("agent-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *instructionsEdit = window.findChild<QTextEdit *>("inspectorAgentInstructionsEdit");
+    auto *modelNameEdit = window.findChild<QLineEdit *>("inspectorAgentModelNameEdit");
+    auto *maxIterationsSpin = window.findChild<QSpinBox *>("inspectorAgentMaxIterationsSpin");
+    QVERIFY(editor != nullptr);
+    QVERIFY(instructionsEdit != nullptr);
+    QVERIFY(modelNameEdit != nullptr);
+    QVERIFY(maxIterationsSpin != nullptr);
+
+    const auto agentNode = editor->createNode("agent");
+    editor->selectNode(agentNode);
+    instructionsEdit->setPlainText("Triage the task, call tools when needed, then produce a concise answer.");
+    modelNameEdit->setText("gpt-5.4");
+    maxIterationsSpin->setValue(7);
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredAgentNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("Agent"));
+    QVERIFY(restoredAgentNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredAgentNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("agentInstructions").toString(),
+             QString("Triage the task, call tools when needed, then produce a concise answer."));
+    QCOMPARE(restoredEditor->selectedNodeProperty("modelName").toString(), QString("gpt-5.4"));
+    QCOMPARE(restoredEditor->selectedNodeProperty("maxIterations").toInt(), 7);
+}
+
+void MainWindowTests::savesAndLoadsChatOutputNodeProperties()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("chat-output-workflow.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *roleEdit = window.findChild<QLineEdit *>("inspectorChatOutputRoleEdit");
+    auto *templateEdit = window.findChild<QTextEdit *>("inspectorChatOutputTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(roleEdit != nullptr);
+    QVERIFY(templateEdit != nullptr);
+
+    const auto chatOutputNode = editor->createNode("chatOutput");
+    editor->selectNode(chatOutputNode);
+    roleEdit->setText("assistant");
+    templateEdit->setPlainText("{{agent.final_answer}}");
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredChatOutputNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("聊天输出"));
+    QVERIFY(restoredChatOutputNode != QtNodes::InvalidNodeId);
+    restoredEditor->selectNode(restoredChatOutputNode);
+    QCOMPARE(restoredEditor->selectedNodeProperty("messageRole").toString(), QString("assistant"));
+    QCOMPARE(restoredEditor->selectedNodeProperty("messageTemplate").toString(), QString("{{agent.final_answer}}"));
 }
 
 void MainWindowTests::tracksDirtyStateOnEdits()

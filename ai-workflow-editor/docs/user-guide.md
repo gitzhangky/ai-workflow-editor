@@ -17,11 +17,15 @@
 - `开始`
 - `提示词`
 - `大模型`
+- `Agent`
 - `记忆`
 - `检索器`
 - `模板变量`
+- `HTTP 请求`
+- `JSON 转换`
 - `工具`
 - `条件`
+- `聊天输出`
 - `输出`
 
 当前版本重点是：
@@ -156,6 +160,13 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
   - `模型名称`
   - `温度`
   - `最大令牌数`
+- `Agent`
+  - `Agent 指令`
+  - `模型名称`
+  - `最大迭代次数`
+- `聊天输出`
+  - `消息角色`
+  - `消息模板`
 - `记忆`
   - `记忆键`
 - `检索器`
@@ -168,6 +179,8 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
   - `请求头 JSON`
   - `请求体模板`
   - `超时（毫秒）`
+- `JSON 转换`
+  - `转换 JSON`
 - `工具`
   - `工具名称`
   - `超时（毫秒）`
@@ -185,9 +198,14 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 
 - `提示词模板为空`
 - `模型名称不能为空`
+- `Agent 指令不能为空`
+- `Agent 模型名称不能为空`
+- `聊天输出模板不能为空`
 - `记忆键不能为空`
 - `请求 URL 不能为空`
 - `请求头必须是合法的 JSON 对象`
+- `转换 JSON 不能为空`
+- `转换 JSON 必须是合法的 JSON 对象`
 - `工具名称不能为空`
 - `输入映射必须是合法的 JSON 对象`
 - `开始节点需要连接到下一步`
@@ -269,6 +287,14 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - 校验要求：
   - `请求 URL` 不能为空
   - `请求头 JSON` 如果填写，必须是合法 JSON 对象
+
+### JSON 转换
+
+- 作用：把上一步的 JSON 结果重组为一个新的 JSON 对象
+- 典型用法：放在 `HTTP 请求`、`工具` 或其他产生结构化结果的节点后面
+- 校验要求：
+  - `转换 JSON` 不能为空
+  - 必须是合法 JSON 对象
 
 ### 工具
 
@@ -385,6 +411,8 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 | 检索器 | `检索器键` 为空 | 在 Inspector 填写检索器键 |
 | 模板变量 | 变量内容为空 | 在 Inspector 填写变量 JSON |
 | 模板变量 | 不是合法 JSON 对象 | 改成合法 JSON 对象 |
+| JSON 转换 | 转换内容为空 | 在 Inspector 填写转换 JSON |
+| JSON 转换 | 不是合法 JSON 对象 | 改成合法 JSON 对象 |
 | 工具 | `工具名称` 为空 | 在 Inspector 填写工具名称 |
 | 工具 | `输入映射` 不是合法 JSON | 改成合法 JSON 对象 |
 | 条件 | 没有输入连接 | 给条件节点接入上游 |
@@ -536,6 +564,27 @@ flowchart TD
 - 空 URL 会给出 warning
 - 非法请求头 JSON 会给出 error
 - 保存后重新打开还能保留请求配置
+
+## 再试一个包含 JSON 转换的示例
+
+如果你想体验 `JSON 转换` 节点，可以试这条链路：
+
+```text
+开始 -> HTTP 请求(success) -> JSON 转换 -> 输出
+```
+
+建议填写：
+
+- `HTTP 请求 -> 请求 URL`
+  - `https://api.example.com/search`
+- `JSON 转换 -> 转换 JSON`
+  - `{"summary": "{{http.response.summary}}", "source": "search-api"}`
+
+这个例子适合用来确认：
+
+- `JSON 转换` 已经可以加入节点库和画布
+- 空值和非法 JSON 都会被校验出来
+- 保存后重新打开还能保留转换配置
 
 ## 常见问题
 

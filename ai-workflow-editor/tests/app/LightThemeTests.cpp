@@ -34,6 +34,8 @@ void LightThemeTests::buildsWorkbenchStyleSheet()
     QVERIFY(styleSheet.contains("QDockWidget#nodeLibraryDock"));
     QVERIFY(styleSheet.contains("QDockWidget#inspectorDock"));
     QVERIFY(styleSheet.contains("QListWidget#nodeLibraryList"));
+    QVERIFY(styleSheet.contains("padding: 12px;"));
+    QVERIFY(!styleSheet.contains("QListWidget#nodeLibraryList QScrollBar:vertical"));
     QVERIFY(!styleSheet.contains("QListWidget#nodeLibraryList::item"));
     QVERIFY(styleSheet.contains("QStatusBar"));
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QListWidget>
 #include <QPixmap>
 #include <QRectF>
@@ -32,6 +33,10 @@ public:
     explicit NodeLibraryListWidget(QWidget *parent = nullptr);
     static QPixmap dragPreviewPixmap();
     static QRectF alignedCardRect(QRectF const &rect);
+    static int scrollIndicatorWidth();
+    static qreal scrollIndicatorCornerRadius();
+    static QColor scrollIndicatorTrackColor();
+    static QColor scrollIndicatorThumbColor();
     QListWidgetItem *addSectionHeader(QString const &title, QIcon const &icon);
     QListWidgetItem *addNodeEntry(QString const &typeKey,
                                   QString const &displayName,
@@ -42,13 +47,22 @@ public:
     void toggleSection(QListWidgetItem *headerItem);
 
 protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     QStringList mimeTypes() const override;
     QMimeData *mimeData(QList<QListWidgetItem *> items) const override;
     Qt::DropActions supportedDragActions() const;
+    void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
     void startDrag(Qt::DropActions supportedActions) override;
 
 private:
     void applyVisibility();
+    void queueScrollIndicatorRefresh();
+    void refreshScrollIndicator();
+    void updateScrollIndicatorGeometry();
 
     QString _filterText;
+    QWidget *_scrollIndicator;
+    bool _viewportHovered;
+    bool _scrollIndicatorHovered;
 };

@@ -88,6 +88,20 @@ private:
     QLabel *_llmMaxTokensLabel;
     QSpinBox *_llmMaxTokensSpin;
 
+    QWidget *_agentSection;
+    QLabel *_agentInstructionsLabel;
+    QTextEdit *_agentInstructionsEdit;
+    QLabel *_agentModelNameLabel;
+    QLineEdit *_agentModelNameEdit;
+    QLabel *_agentMaxIterationsLabel;
+    QSpinBox *_agentMaxIterationsSpin;
+
+    QWidget *_chatOutputSection;
+    QLabel *_chatOutputRoleLabel;
+    QLineEdit *_chatOutputRoleEdit;
+    QLabel *_chatOutputTemplateLabel;
+    QTextEdit *_chatOutputTemplateEdit;
+
     QWidget *_memorySection;
     QLabel *_memoryKeyLabel;
     QLineEdit *_memoryKeyEdit;
@@ -111,6 +125,10 @@ private:
     QTextEdit *_httpRequestBodyEdit;
     QLabel *_httpRequestTimeoutLabel;
     QSpinBox *_httpRequestTimeoutSpin;
+
+    QWidget *_jsonTransformSection;
+    QLabel *_jsonTransformLabel;
+    QTextEdit *_jsonTransformEdit;
 
     QWidget *_toolSection;
     QLabel *_toolNameLabel;
