@@ -9,7 +9,9 @@ public:
     enum class Format
     {
         PythonLangChain,
-        PythonScript
+        PythonScript,
+        PythonLangGraph,
+        PythonCrewAI
     };
 
     struct Result
@@ -48,6 +50,8 @@ private:
 
     static Result generatePythonLangChain(QJsonObject const &workflow);
     static Result generatePythonScript(QJsonObject const &workflow);
+    static Result generatePythonLangGraph(QJsonObject const &workflow);
+    static Result generatePythonCrewAI(QJsonObject const &workflow);
 
     static QString sanitizeVariableName(QString const &displayName);
     static QList<NodeInfo> parseNodes(QJsonObject const &workflow);

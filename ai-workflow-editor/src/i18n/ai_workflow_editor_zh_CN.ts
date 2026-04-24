@@ -178,6 +178,8 @@
     <message><source>Export</source><translation>导出</translation></message>
     <message><source>Python (LangChain)</source><translation>Python (LangChain)</translation></message>
     <message><source>Python Script</source><translation>Python 脚本</translation></message>
+    <message><source>Python (LangGraph)</source><translation>Python (LangGraph)</translation></message>
+    <message><source>Python (CrewAI)</source><translation>Python (CrewAI)</translation></message>
     <message><source>Export Workflow</source><translation>导出工作流</translation></message>
     <message><source>No workflow to export.</source><translation>没有可导出的工作流。</translation></message>
     <message><source>Export Failed</source><translation>导出失败</translation></message>

@@ -71,6 +71,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _exportMenu(nullptr)
     , _exportLangChainAction(nullptr)
     , _exportPythonAction(nullptr)
+    , _exportLangGraphAction(nullptr)
+    , _exportCrewAIAction(nullptr)
     , _copyAction(nullptr)
     , _pasteAction(nullptr)
     , _duplicateAction(nullptr)
@@ -128,6 +130,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _exportLangChainAction->setObjectName("exportLangChainAction");
     _exportPythonAction = new QAction(this);
     _exportPythonAction->setObjectName("exportPythonAction");
+    _exportLangGraphAction = new QAction(this);
+    _exportLangGraphAction->setObjectName("exportLangGraphAction");
+    _exportCrewAIAction = new QAction(this);
+    _exportCrewAIAction->setObjectName("exportCrewAIAction");
     _copyAction = new QAction(this);
     _copyAction->setObjectName("copyAction");
     _pasteAction = new QAction(this);
@@ -340,6 +346,12 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_exportPythonAction, &QAction::triggered, this, [this]() {
         exportWorkflow(WorkflowExporter::Format::PythonScript);
     });
+    connect(_exportLangGraphAction, &QAction::triggered, this, [this]() {
+        exportWorkflow(WorkflowExporter::Format::PythonLangGraph);
+    });
+    connect(_exportCrewAIAction, &QAction::triggered, this, [this]() {
+        exportWorkflow(WorkflowExporter::Format::PythonCrewAI);
+    });
 
     connect(_copyAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::copySelection);
     connect(_pasteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::pasteClipboard);
@@ -449,6 +461,8 @@ void MainWindow::updateWorkbenchActionStates()
     _exportMenu->setEnabled(hasNodes);
     _exportLangChainAction->setEnabled(hasNodes);
     _exportPythonAction->setEnabled(hasNodes);
+    _exportLangGraphAction->setEnabled(hasNodes);
+    _exportCrewAIAction->setEnabled(hasNodes);
 }
 
 NodeLibraryListWidget *MainWindow::createNodeLibrary()
@@ -511,6 +525,8 @@ void MainWindow::retranslateUi()
     _exportMenu->setTitle(tr("Export"));
     _exportLangChainAction->setText(tr("Python (LangChain)"));
     _exportPythonAction->setText(tr("Python Script"));
+    _exportLangGraphAction->setText(tr("Python (LangGraph)"));
+    _exportCrewAIAction->setText(tr("Python (CrewAI)"));
     _recentFilesMenu->setTitle(tr("Recent Files"));
     _copyAction->setText(tr("Copy"));
     _pasteAction->setText(tr("Paste"));
@@ -559,6 +575,9 @@ void MainWindow::retranslateUi()
     _fileMenu->addSeparator();
     _exportMenu->clear();
     _exportMenu->addAction(_exportLangChainAction);
+    _exportMenu->addAction(_exportLangGraphAction);
+    _exportMenu->addAction(_exportCrewAIAction);
+    _exportMenu->addSeparator();
     _exportMenu->addAction(_exportPythonAction);
     _fileMenu->addMenu(_exportMenu);
     _fileMenu->addSeparator();

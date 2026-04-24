@@ -176,6 +176,8 @@ private:
     void clearDropPreview();
     void updateConnectionFeedback(QPoint const &viewportPoint);
     void clearConnectionFeedback();
+    void onConnectionCreated(QtNodes::ConnectionId const connectionId);
+    void onConnectionDeleted(QtNodes::ConnectionId const connectionId);
     void handleNodeSelected(QtNodes::NodeId nodeId);
     void emitSelectedNodeValidation();
     void retranslateBuiltInContent();

@@ -77,6 +77,8 @@ private:
     QMenu *_exportMenu;
     QAction *_exportLangChainAction;
     QAction *_exportPythonAction;
+    QAction *_exportLangGraphAction;
+    QAction *_exportCrewAIAction;
     QAction *_copyAction;
     QAction *_pasteAction;
     QAction *_duplicateAction;

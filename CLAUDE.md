@@ -131,7 +131,7 @@ InspectorPanel (user edits a field)
 - [x] **WorkflowGraphModel** — custom DataFlowGraphModel subclass enforcing port type compatibility
 - [x] **Undo commands extracted** — moved to `UndoCommands.hpp/.cpp` (QtNodesEditorWidget 2005→1711 lines)
 - [x] **File format versioning** — save format version 2, accepts v1 files with forward compatibility
-- [x] **Workflow export** — export to Python (LangChain) and Python Script formats via File > Export menu
+- [x] **Workflow export** — export to Python (LangChain), Python Script, Python (LangGraph), and Python (CrewAI) formats via File > Export menu
 
 ## What To Build Next
 
@@ -139,7 +139,7 @@ InspectorPanel (user edits a field)
 2. **Multi-node operations** — rubber band selection, batch move, alignment
 3. **Node grouping / sub-workflows**
 4. **Canvas mini-map**
-5. **Additional export formats** — LangGraph, CrewAI, etc.
+5. **Additional export formats** — more frameworks as needed
 
 ## Rules For Agents
 

@@ -116,6 +116,9 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
     connect(_view->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this](int) { scheduleMiniMapUpdate(); });
     connect(_view->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int) { scheduleMiniMapUpdate(); });
 
+    connect(_graphModel.get(), &WorkflowGraphModel::connectionCreated, this, &QtNodesEditorWidget::onConnectionCreated);
+    connect(_graphModel.get(), &WorkflowGraphModel::connectionDeleted, this, &QtNodesEditorWidget::onConnectionDeleted);
+
     auto *deleteShortcut = new QShortcut(QKeySequence::Delete, this);
     connect(deleteShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
 
@@ -464,11 +467,14 @@ void QtNodesEditorWidget::centerSelection()
         _view->zoomFitAll();
     else
         _view->zoomFitSelected();
+
+    Q_EMIT zoomLevelChanged(zoomPercent());
 }
 
 void QtNodesEditorWidget::fitWorkflow()
 {
     _view->zoomFitAll();
+    Q_EMIT zoomLevelChanged(zoomPercent());
 }
 
 void QtNodesEditorWidget::undo()
@@ -1658,6 +1664,16 @@ QSize QtNodesEditorWidget::computePreviewNodeSize(QString const &typeKey) const
     return previewGeometry.size(nodeId);
 }
 
+void QtNodesEditorWidget::onConnectionCreated(QtNodes::ConnectionId const connectionId)
+{
+    refreshValidationForConnectionEndpoints(connectionId);
+}
+
+void QtNodesEditorWidget::onConnectionDeleted(QtNodes::ConnectionId const connectionId)
+{
+    refreshValidationForConnectionEndpoints(connectionId);
+}
+
 void QtNodesEditorWidget::handleNodeSelected(QtNodes::NodeId nodeId)
 {
     auto nodeStateIt = _nodeStates.find(nodeId);
@@ -1753,8 +1769,10 @@ void QtNodesEditorWidget::updateMiniMap()
 
     miniMap->setSceneSnapshot(nodeRects, _view->mapToScene(_view->viewport()->rect()).boundingRect());
     _miniMap->setVisible(miniMap->hasContent());
-    if (_miniMap->isVisible())
+    if (_miniMap->isVisible()) {
         _miniMap->raise();
+        _miniMap->update();
+    }
 }
 
 void QtNodesEditorWidget::layoutMiniMap()

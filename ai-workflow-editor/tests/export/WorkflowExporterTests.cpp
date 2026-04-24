@@ -441,6 +441,229 @@ private slots:
         QVERIFY(result.code.contains("result = gpt4o"));
         QVERIFY(result.code.contains("if __name__"));
     }
+
+    // --- LangGraph tests ---
+
+    void langgraphExportEmptyWorkflowFails()
+    {
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow({}), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(!result.success);
+    }
+
+    void langgraphExportContainsStateGraph()
+    {
+        QJsonArray nodes;
+        nodes.append(makeNode(0, "start", "Start"));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("from langgraph.graph import StateGraph, START, END"));
+        QVERIFY(result.code.contains("WorkflowState"));
+        QVERIFY(result.code.contains("workflow = StateGraph(WorkflowState)"));
+    }
+
+    void langgraphExportAddsNodesAndEdges()
+    {
+        QJsonArray nodes;
+        nodes.append(makeNode(0, "start", "Start"));
+
+        QJsonObject promptProps;
+        promptProps["userPromptTemplate"] = "{input}";
+        nodes.append(makeNode(1, "prompt", "Prompt", promptProps));
+
+        QJsonObject llmProps;
+        llmProps["modelName"] = "gpt-4";
+        nodes.append(makeNode(2, "llm", "LLM", llmProps));
+
+        QJsonArray connections;
+        connections.append(makeConnection(0, 0, 1, 0));
+        connections.append(makeConnection(1, 0, 2, 0));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes, connections), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("workflow.add_node(\"start\", start)"));
+        QVERIFY(result.code.contains("workflow.add_node(\"prompt\", prompt)"));
+        QVERIFY(result.code.contains("workflow.add_node(\"llm\", llm)"));
+        QVERIFY(result.code.contains("workflow.add_edge(\"start\", \"prompt\")"));
+        QVERIFY(result.code.contains("workflow.add_edge(\"prompt\", \"llm\")"));
+        QVERIFY(result.code.contains("workflow.add_edge(START, \"start\")"));
+    }
+
+    void langgraphExportCompilesAndRuns()
+    {
+        QJsonArray nodes;
+        nodes.append(makeNode(0, "start", "Start"));
+        nodes.append(makeNode(1, "output", "Output"));
+
+        QJsonArray connections;
+        connections.append(makeConnection(0, 0, 1, 0));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes, connections), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("app = workflow.compile()"));
+        QVERIFY(result.code.contains("if __name__"));
+        QVERIFY(result.code.contains("app.invoke("));
+    }
+
+    void langgraphExportHandlesCondition()
+    {
+        QJsonArray nodes;
+        nodes.append(makeNode(0, "start", "Start"));
+        nodes.append(makeNode(1, "condition", "Check", {}));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("def check(state: WorkflowState) -> str:"));
+    }
+
+    void langgraphExportHandlesHttpRequest()
+    {
+        QJsonObject props;
+        props["method"] = "POST";
+        props["url"] = "https://api.example.com";
+        props["timeoutMs"] = 5000;
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "httpRequest", "API Call", props));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("import requests"));
+        QVERIFY(result.code.contains("requests.post("));
+        QVERIFY(result.code.contains("https://api.example.com"));
+    }
+
+    void langgraphExportHandlesTool()
+    {
+        QJsonObject props;
+        props["toolName"] = "web_search";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "tool", "Search Tool", props));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonLangGraph);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("from langchain_core.tools import tool"));
+        QVERIFY(result.code.contains("@tool"));
+        QVERIFY(result.code.contains("web_search"));
+    }
+
+    // --- CrewAI tests ---
+
+    void crewaiExportEmptyWorkflowFails()
+    {
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow({}), WorkflowExporter::Format::PythonCrewAI);
+        QVERIFY(!result.success);
+    }
+
+    void crewaiExportContainsCrewImports()
+    {
+        QJsonObject agentProps;
+        agentProps["agentInstructions"] = "Help the user.";
+        agentProps["modelName"] = "gpt-4";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "agent", "Helper", agentProps));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonCrewAI);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("from crewai import Agent, Task, Crew, Process"));
+        QVERIFY(result.code.contains("Auto-generated by AI Workflow Editor"));
+    }
+
+    void crewaiExportGeneratesAgentAndCrew()
+    {
+        QJsonObject agentProps;
+        agentProps["agentInstructions"] = "Research topics.";
+        agentProps["modelName"] = "gpt-4o";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "agent", "Researcher", agentProps));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonCrewAI);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("researcher = Agent("));
+        QVERIFY(result.code.contains("role=\"Researcher\""));
+        QVERIFY(result.code.contains("gpt-4o"));
+        QVERIFY(result.code.contains("crew = Crew("));
+        QVERIFY(result.code.contains("agents=[researcher]"));
+        QVERIFY(result.code.contains("crew.kickoff()"));
+    }
+
+    void crewaiExportGeneratesTaskFromPrompt()
+    {
+        QJsonObject agentProps;
+        agentProps["agentInstructions"] = "Write.";
+        agentProps["modelName"] = "gpt-4";
+
+        QJsonObject promptProps;
+        promptProps["userPromptTemplate"] = "Summarize the topic.";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(0, "start", "Start"));
+        nodes.append(makeNode(1, "agent", "Writer", agentProps));
+        nodes.append(makeNode(2, "prompt", "Task Prompt", promptProps));
+
+        QJsonArray connections;
+        connections.append(makeConnection(0, 0, 1, 0));
+        connections.append(makeConnection(1, 0, 2, 0));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes, connections), WorkflowExporter::Format::PythonCrewAI);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("task_prompt_task = Task("));
+        QVERIFY(result.code.contains("Summarize the topic."));
+        QVERIFY(result.code.contains("tasks=[task_prompt_task]"));
+    }
+
+    void crewaiExportGeneratesToolClass()
+    {
+        QJsonObject props;
+        props["toolName"] = "calculator";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "tool", "Calc Tool", props));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonCrewAI);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("from crewai.tools import BaseTool"));
+        QVERIFY(result.code.contains("class Calc_toolTool(BaseTool):"));
+        QVERIFY(result.code.contains("calculator"));
+    }
+
+    void crewaiExportMapsLlmToAgent()
+    {
+        QJsonObject llmProps;
+        llmProps["modelName"] = "claude-3.5-sonnet";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "llm", "Claude", llmProps));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonCrewAI);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("claude = Agent("));
+        QVERIFY(result.code.contains("claude-3.5-sonnet"));
+    }
+
+    void formatDisplayNameReturnsNewFormats()
+    {
+        QCOMPARE(WorkflowExporter::formatDisplayName(WorkflowExporter::Format::PythonLangGraph),
+                 QStringLiteral("Python (LangGraph)"));
+        QCOMPARE(WorkflowExporter::formatDisplayName(WorkflowExporter::Format::PythonCrewAI),
+                 QStringLiteral("Python (CrewAI)"));
+    }
 };
 
 QTEST_MAIN(WorkflowExporterTests)
