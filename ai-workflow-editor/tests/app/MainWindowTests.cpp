@@ -99,6 +99,7 @@ private slots:
     void showsCanvasMiniMapWhenWorkflowHasNodes();
     void clickingCanvasMiniMapRecentersLargeCanvas();
     void draggingCanvasMiniMapViewportPansWithoutInitialJump();
+    void fitWorkflowActionShowsEntireLargeWorkflow();
     void defaultsWorkbenchTextToChinese();
     void keepsChineseDefaultWhenExternalTranslationFileIsUnavailable();
     void retranslatesWorkbenchTextToEnglishAtRuntime();
@@ -283,7 +284,7 @@ void MainWindowTests::createsPrimaryToolbarAndStatusBar()
 
     auto *toolbar = window.findChild<QToolBar *>("primaryToolBar");
     QVERIFY(toolbar != nullptr);
-    QCOMPARE(toolbar->actions().size(), 12);
+    QCOMPARE(toolbar->actions().size(), 13);
     QCOMPARE(toolbar->actions().at(0)->text(), QString::fromUtf8("新建"));
     QCOMPARE(toolbar->actions().at(2)->text(), QString::fromUtf8("保存"));
 
@@ -299,7 +300,7 @@ void MainWindowTests::showsGroupedToolbarLayout()
     QVERIFY(toolbar != nullptr);
 
     const auto actions = toolbar->actions();
-    QCOMPARE(actions.size(), 12);
+    QCOMPARE(actions.size(), 13);
     QCOMPARE(actions.at(0)->objectName(), QString("newAction"));
     QCOMPARE(actions.at(1)->objectName(), QString("openAction"));
     QCOMPARE(actions.at(2)->objectName(), QString("saveAction"));
@@ -310,8 +311,9 @@ void MainWindowTests::showsGroupedToolbarLayout()
     QVERIFY(actions.at(7)->isSeparator());
     QCOMPARE(actions.at(8)->objectName(), QString("selectAllAction"));
     QCOMPARE(actions.at(9)->objectName(), QString("centerAction"));
-    QVERIFY(actions.at(10)->isSeparator());
-    QVERIFY(actions.at(11)->isSeparator() == false);
+    QCOMPARE(actions.at(10)->objectName(), QString("fitWorkflowAction"));
+    QVERIFY(actions.at(11)->isSeparator());
+    QVERIFY(actions.at(12)->isSeparator() == false);
 }
 
 void MainWindowTests::exposesToolbarStylingHooks()
@@ -488,6 +490,39 @@ void MainWindowTests::draggingCanvasMiniMapViewportPansWithoutInitialJump()
     const QPointF afterDragCenter = editor->viewportSceneCenter();
     QVERIFY(afterDragCenter.x() > beforeCenter.x() + 120.0);
     QVERIFY(afterDragCenter.y() > beforeCenter.y() + 80.0);
+}
+
+void MainWindowTests::fitWorkflowActionShowsEntireLargeWorkflow()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *fitWorkflowAction = window.findChild<QAction *>("fitWorkflowAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(fitWorkflowAction != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    editor->setNodePosition(startNode, QPointF(0.0, 0.0));
+    editor->setNodePosition(outputNode, QPointF(2400.0, 1600.0));
+    editor->selectNode(startNode);
+    editor->centerSelection();
+    QCoreApplication::processEvents();
+
+    const QPointF beforeCenter = editor->viewportSceneCenter();
+    fitWorkflowAction->trigger();
+    QCoreApplication::processEvents();
+
+    const QPointF afterCenter = editor->viewportSceneCenter();
+    QVERIFY(afterCenter.x() > beforeCenter.x() + 400.0);
+    QVERIFY(afterCenter.y() > beforeCenter.y() + 250.0);
 }
 
 void MainWindowTests::defaultsWorkbenchTextToChinese()
@@ -2070,6 +2105,7 @@ void MainWindowTests::assignsExpectedKeyboardShortcuts()
     auto *undoAction = window.findChild<QAction *>("undoAction");
     auto *redoAction = window.findChild<QAction *>("redoAction");
     auto *centerAction = window.findChild<QAction *>("centerAction");
+    auto *fitWorkflowAction = window.findChild<QAction *>("fitWorkflowAction");
     auto *selectAllAction = window.findChild<QAction *>("selectAllAction");
 
     QVERIFY(newAction != nullptr);
@@ -2080,6 +2116,7 @@ void MainWindowTests::assignsExpectedKeyboardShortcuts()
     QVERIFY(undoAction != nullptr);
     QVERIFY(redoAction != nullptr);
     QVERIFY(centerAction != nullptr);
+    QVERIFY(fitWorkflowAction != nullptr);
     QVERIFY(selectAllAction != nullptr);
 
     QCOMPARE(newAction->shortcut(), QKeySequence::keyBindings(QKeySequence::New).constFirst());
@@ -2090,6 +2127,7 @@ void MainWindowTests::assignsExpectedKeyboardShortcuts()
     QCOMPARE(undoAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Undo).constFirst());
     QCOMPARE(redoAction->shortcut(), QKeySequence::keyBindings(QKeySequence::Redo).constFirst());
     QCOMPARE(centerAction->shortcut(), QKeySequence(Qt::Key_Space));
+    QCOMPARE(fitWorkflowAction->shortcut(), QKeySequence(Qt::CTRL | Qt::Key_0));
     QCOMPARE(selectAllAction->shortcut(), QKeySequence::keyBindings(QKeySequence::SelectAll).constFirst());
 }
 
@@ -2103,18 +2141,21 @@ void MainWindowTests::enablesWorkbenchActionsBasedOnEditorState()
     auto *undoAction = window.findChild<QAction *>("undoAction");
     auto *redoAction = window.findChild<QAction *>("redoAction");
     auto *centerAction = window.findChild<QAction *>("centerAction");
+    auto *fitWorkflowAction = window.findChild<QAction *>("fitWorkflowAction");
     auto *selectAllAction = window.findChild<QAction *>("selectAllAction");
     QVERIFY(editor != nullptr);
     QVERIFY(deleteAction != nullptr);
     QVERIFY(undoAction != nullptr);
     QVERIFY(redoAction != nullptr);
     QVERIFY(centerAction != nullptr);
+    QVERIFY(fitWorkflowAction != nullptr);
     QVERIFY(selectAllAction != nullptr);
 
     QVERIFY(!undoAction->isEnabled());
     QVERIFY(!redoAction->isEnabled());
     QVERIFY(!deleteAction->isEnabled());
     QVERIFY(!centerAction->isEnabled());
+    QVERIFY(!fitWorkflowAction->isEnabled());
     QVERIFY(!selectAllAction->isEnabled());
 
     const auto promptNode = editor->createNode("prompt");
@@ -2124,6 +2165,7 @@ void MainWindowTests::enablesWorkbenchActionsBasedOnEditorState()
     QVERIFY(!redoAction->isEnabled());
     QVERIFY(deleteAction->isEnabled());
     QVERIFY(centerAction->isEnabled());
+    QVERIFY(fitWorkflowAction->isEnabled());
     QVERIFY(selectAllAction->isEnabled());
 
     clearCanvasSelection(editor);
@@ -2132,6 +2174,7 @@ void MainWindowTests::enablesWorkbenchActionsBasedOnEditorState()
     QVERIFY(!redoAction->isEnabled());
     QVERIFY(!deleteAction->isEnabled());
     QVERIFY(centerAction->isEnabled());
+    QVERIFY(fitWorkflowAction->isEnabled());
     QVERIFY(selectAllAction->isEnabled());
 
     undoAction->trigger();
@@ -2140,6 +2183,7 @@ void MainWindowTests::enablesWorkbenchActionsBasedOnEditorState()
     QVERIFY(redoAction->isEnabled());
     QVERIFY(!deleteAction->isEnabled());
     QVERIFY(!centerAction->isEnabled());
+    QVERIFY(!fitWorkflowAction->isEnabled());
     QVERIFY(!selectAllAction->isEnabled());
 }
 

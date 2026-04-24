@@ -465,6 +465,11 @@ void QtNodesEditorWidget::centerSelection()
         _view->zoomFitSelected();
 }
 
+void QtNodesEditorWidget::fitWorkflow()
+{
+    _view->zoomFitAll();
+}
+
 void QtNodesEditorWidget::undo()
 {
     _scene->undoStack().undo();

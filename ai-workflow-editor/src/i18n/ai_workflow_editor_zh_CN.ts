@@ -154,6 +154,7 @@
     <message><source>Undo</source><translation>撤销</translation></message>
     <message><source>Redo</source><translation>重做</translation></message>
     <message><source>Center</source><translation>居中</translation></message>
+    <message><source>Fit Workflow</source><translation>适配全图</translation></message>
     <message><source>Language</source><translation>语言</translation></message>
     <message><source>Show Node Library</source><translation>显示节点库</translation></message>
     <message><source>Show Inspector</source><translation>显示属性面板</translation></message>

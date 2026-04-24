@@ -52,6 +52,7 @@ public:
     void deleteSelection();
     void selectAllNodes();
     void centerSelection();
+    void fitWorkflow();
     void copySelection();
     void pasteClipboard();
     void duplicateSelection();

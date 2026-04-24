@@ -66,7 +66,7 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 应用分成 6 个区域：
 
 1. 顶部菜单栏和工具栏  
-   用来新建、打开、保存、撤销、重做、删除、全选、居中，以及切换语言。
+   用来新建、打开、保存、撤销、重做、删除、全选、居中、适配全图，以及切换语言。
 
 2. 左侧节点库  
    按类别列出可用节点。支持搜索、折叠分组、双击添加、拖拽到画布。
@@ -383,7 +383,9 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 
 ### 居中
 
-点击工具栏 `居中` 可以把当前工作区内容重新带回视野中央，适合画布拖远之后快速回到主区域。
+点击工具栏 `居中` 可以聚焦当前选中节点；如果当前没有选中节点，则会把工作流内容重新带回视野中央。
+
+点击工具栏 `适配全图` 可以忽略当前选择，直接缩放并平移到完整工作流，适合节点很多、画布被拖远或需要快速查看全局结构时使用。
 
 ### 搜索节点
 
@@ -421,6 +423,7 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - `Duplicate`：`Command+D`
 - `Delete`：`Delete`
 - `Center`：`Space`
+- `Fit Workflow`：`Command+0`
 
 在 macOS 上，通常分别对应：
 
@@ -660,7 +663,7 @@ flowchart TD
 
 例如：
 
-- 没有任何节点时，`全选` 和 `居中` 会变灰
+- 没有任何节点时，`全选`、`居中` 和 `适配全图` 会变灰
 - 没有可撤销历史时，`撤销` 会变灰
 - 没有选中内容时，`删除` 会变灰
 

@@ -85,6 +85,7 @@ private:
     QAction *_undoAction;
     QAction *_redoAction;
     QAction *_centerAction;
+    QAction *_fitWorkflowAction;
     QAction *_toggleNodeLibraryAction;
     QAction *_toggleInspectorAction;
     QAction *_languageMenuAction;

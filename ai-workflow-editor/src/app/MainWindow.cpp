@@ -79,6 +79,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _undoAction(nullptr)
     , _redoAction(nullptr)
     , _centerAction(nullptr)
+    , _fitWorkflowAction(nullptr)
     , _toggleNodeLibraryAction(nullptr)
     , _toggleInspectorAction(nullptr)
     , _languageMenuAction(nullptr)
@@ -146,6 +147,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _primaryToolBar->addAction(_selectAllAction);
     _centerAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("center")), QString());
     _centerAction->setObjectName("centerAction");
+    _fitWorkflowAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("fit-workflow")), QString());
+    _fitWorkflowAction->setObjectName("fitWorkflowAction");
     _primaryToolBar->addSeparator();
 
     _toggleNodeLibraryAction = new QAction(this);
@@ -346,6 +349,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_undoAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::undo);
     connect(_redoAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::redo);
     connect(_centerAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::centerSelection);
+    connect(_fitWorkflowAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::fitWorkflow);
 
     connect(_languageChineseAction, &QAction::triggered, this, [this]() {
         if (_languageManager != nullptr)
@@ -440,6 +444,7 @@ void MainWindow::updateWorkbenchActionStates()
     _deleteAction->setEnabled(_editorWidget->hasSelection());
     _selectAllAction->setEnabled(_editorWidget->hasNodes());
     _centerAction->setEnabled(_editorWidget->hasNodes());
+    _fitWorkflowAction->setEnabled(_editorWidget->hasNodes());
     const bool hasNodes = _editorWidget->hasNodes();
     _exportMenu->setEnabled(hasNodes);
     _exportLangChainAction->setEnabled(hasNodes);
@@ -524,9 +529,11 @@ void MainWindow::retranslateUi()
     _undoAction->setText(tr("Undo"));
     _redoAction->setText(tr("Redo"));
     _centerAction->setText(tr("Center"));
+    _fitWorkflowAction->setText(tr("Fit Workflow"));
     _undoAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Undo).constFirst());
     _redoAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Redo).constFirst());
     _centerAction->setShortcut(QKeySequence(Qt::Key_Space));
+    _fitWorkflowAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
     _toggleNodeLibraryAction->setText(tr("Show Node Library"));
     _toggleInspectorAction->setText(tr("Show Inspector"));
     _languageToolButton->setToolTip(tr("Language"));
@@ -570,6 +577,7 @@ void MainWindow::retranslateUi()
 
     _viewMenu->clear();
     _viewMenu->addAction(_centerAction);
+    _viewMenu->addAction(_fitWorkflowAction);
     _viewMenu->addSeparator();
     _viewMenu->addAction(_toggleNodeLibraryAction);
     _viewMenu->addAction(_toggleInspectorAction);
