@@ -10,6 +10,7 @@
 #include <QtNodes/internal/DataFlowGraphicsScene.hpp>
 
 #include <QAction>
+#include <QApplication>
 #include <QDockWidget>
 #include <QDir>
 #include <QFile>
@@ -97,6 +98,7 @@ private slots:
     void keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty();
     void showsCanvasMiniMapWhenWorkflowHasNodes();
     void clickingCanvasMiniMapRecentersLargeCanvas();
+    void draggingCanvasMiniMapViewportPansWithoutInitialJump();
     void defaultsWorkbenchTextToChinese();
     void keepsChineseDefaultWhenExternalTranslationFileIsUnavailable();
     void retranslatesWorkbenchTextToEnglishAtRuntime();
@@ -432,6 +434,60 @@ void MainWindowTests::clickingCanvasMiniMapRecentersLargeCanvas()
     const QPointF afterCenter = editor->viewportSceneCenter();
     QVERIFY(afterCenter.x() > beforeCenter.x() + 400.0);
     QVERIFY(afterCenter.y() > beforeCenter.y() + 250.0);
+}
+
+void MainWindowTests::draggingCanvasMiniMapViewportPansWithoutInitialJump()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    editor->setNodePosition(startNode, QPointF(0.0, 0.0));
+    editor->setNodePosition(outputNode, QPointF(2400.0, 1600.0));
+    editor->selectNode(startNode);
+    editor->centerSelection();
+    QCoreApplication::processEvents();
+
+    auto *miniMap = window.findChild<QWidget *>("canvasMiniMap");
+    QVERIFY(miniMap != nullptr);
+    QVERIFY(editor->miniMapVisible());
+
+    const QRectF indicatorRect = editor->miniMapViewportIndicatorRect();
+    QVERIFY(indicatorRect.isValid());
+
+    const QPointF beforeCenter = editor->viewportSceneCenter();
+    const QPoint pressPoint = (indicatorRect.topLeft() + QPointF(3.0, 3.0)).toPoint();
+    QTest::mousePress(miniMap, Qt::LeftButton, Qt::NoModifier, pressPoint);
+    QCoreApplication::processEvents();
+
+    const QPointF afterPressCenter = editor->viewportSceneCenter();
+    QVERIFY(qAbs(afterPressCenter.x() - beforeCenter.x()) < 20.0);
+    QVERIFY(qAbs(afterPressCenter.y() - beforeCenter.y()) < 20.0);
+
+    const QPoint dragPoint = pressPoint + QPoint(24, 18);
+    QMouseEvent dragEvent(QEvent::MouseMove,
+                          dragPoint,
+                          miniMap->mapToGlobal(dragPoint),
+                          Qt::NoButton,
+                          Qt::LeftButton,
+                          Qt::NoModifier);
+    QApplication::sendEvent(miniMap, &dragEvent);
+    QTest::mouseRelease(miniMap, Qt::LeftButton, Qt::NoModifier, dragPoint);
+    QCoreApplication::processEvents();
+
+    const QPointF afterDragCenter = editor->viewportSceneCenter();
+    QVERIFY(afterDragCenter.x() > beforeCenter.x() + 120.0);
+    QVERIFY(afterDragCenter.y() > beforeCenter.y() + 80.0);
 }
 
 void MainWindowTests::defaultsWorkbenchTextToChinese()

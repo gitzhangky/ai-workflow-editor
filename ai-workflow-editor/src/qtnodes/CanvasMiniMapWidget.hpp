@@ -21,18 +21,21 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
     QRectF contentRect() const;
     QRectF displayRect() const;
     QRectF mapSceneRectToDisplay(QRectF const &sceneRect) const;
     QPointF mapDisplayPointToScene(QPointF const &displayPoint) const;
-    void centerViewOn(QPoint const &widgetPoint);
+    void centerViewOn(QPointF const &widgetPoint);
 
     QGraphicsView *_view;
     QVector<QRectF> _nodeSceneRects;
     QRectF _sceneRect;
     QRectF _viewportSceneRect;
     QRectF _viewportIndicatorRect;
+    QPointF _viewportDragOffset;
     bool _hasContent;
+    bool _draggingViewport;
 };

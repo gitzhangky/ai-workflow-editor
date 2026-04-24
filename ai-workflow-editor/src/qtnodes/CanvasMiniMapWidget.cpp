@@ -19,6 +19,7 @@ CanvasMiniMapWidget::CanvasMiniMapWidget(QGraphicsView *view, QWidget *parent)
     : QWidget(parent)
     , _view(view)
     , _hasContent(false)
+    , _draggingViewport(false)
 {
     setObjectName("canvasMiniMap");
     setAttribute(Qt::WA_StyledBackground, false);
@@ -100,18 +101,34 @@ void CanvasMiniMapWidget::paintEvent(QPaintEvent *event)
 
 void CanvasMiniMapWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton)
-        centerViewOn(event->pos());
+    if (event->button() == Qt::LeftButton) {
+        if (_viewportIndicatorRect.contains(event->pos())) {
+            _draggingViewport = true;
+            _viewportDragOffset = event->pos() - _viewportIndicatorRect.center();
+        } else {
+            centerViewOn(event->pos());
+        }
+    }
 
     QWidget::mousePressEvent(event);
 }
 
 void CanvasMiniMapWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (event->buttons().testFlag(Qt::LeftButton))
-        centerViewOn(event->pos());
+    if (event->buttons().testFlag(Qt::LeftButton)) {
+        const QPointF targetPoint = _draggingViewport ? event->pos() - _viewportDragOffset : event->pos();
+        centerViewOn(targetPoint);
+    }
 
     QWidget::mouseMoveEvent(event);
+}
+
+void CanvasMiniMapWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton)
+        _draggingViewport = false;
+
+    QWidget::mouseReleaseEvent(event);
 }
 
 QRectF CanvasMiniMapWidget::contentRect() const
@@ -173,7 +190,7 @@ QPointF CanvasMiniMapWidget::mapDisplayPointToScene(QPointF const &displayPoint)
                    _sceneRect.top() + (_sceneRect.height() * yRatio));
 }
 
-void CanvasMiniMapWidget::centerViewOn(QPoint const &widgetPoint)
+void CanvasMiniMapWidget::centerViewOn(QPointF const &widgetPoint)
 {
     if (!_hasContent || _view == nullptr)
         return;

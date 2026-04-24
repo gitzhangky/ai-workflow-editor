@@ -583,6 +583,12 @@ QRect QtNodesEditorWidget::miniMapGeometry() const
     return _miniMap != nullptr ? _miniMap->geometry() : QRect();
 }
 
+QRectF QtNodesEditorWidget::miniMapViewportIndicatorRect() const
+{
+    auto const *miniMap = qobject_cast<CanvasMiniMapWidget const *>(_miniMap);
+    return miniMap != nullptr ? miniMap->viewportIndicatorRect() : QRectF();
+}
+
 QPointF QtNodesEditorWidget::viewportSceneCenter() const
 {
     return _view != nullptr ? _view->mapToScene(_view->viewport()->rect().center()) : QPointF();
