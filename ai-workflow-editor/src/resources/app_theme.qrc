@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/app-theme">
+    <file>icons/chrome/tab-close.svg</file>
     <file>icons/nodes/ai.svg</file>
     <file>icons/nodes/agent.svg</file>
     <file>icons/nodes/condition.svg</file>

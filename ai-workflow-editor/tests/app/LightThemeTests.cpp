@@ -30,6 +30,8 @@ void LightThemeTests::buildsWorkbenchStyleSheet()
 
     QVERIFY(!styleSheet.isEmpty());
     QVERIFY(styleSheet.contains("QTabBar::close-button"));
+    QVERIFY(styleSheet.contains("icons/chrome/tab-close.svg"));
+    QVERIFY(!styleSheet.contains("QTabWidget#workbenchTabWidget > QTabBar::close-button {\n    image: none"));
     QVERIFY(styleSheet.contains("QToolBar#primaryToolBar"));
     QVERIFY(styleSheet.contains("QDockWidget#nodeLibraryDock"));
     QVERIFY(styleSheet.contains("QDockWidget#inspectorDock"));
