@@ -239,9 +239,10 @@ Use this exact order:
 2. ~~close/open unsaved confirmation~~ ✅ completed 2026-04-22
 3. ~~recent files menu~~ ✅ completed 2026-04-22
 4. ~~delete selected node and connection~~ ✅ completed 2026-04-22
-5. validation markers ← **START HERE**
-6. expand built-in node set
-7. Windows CI
+5. ~~validation markers~~ ✅ completed 2026-04-24
+6. ~~expand built-in node set~~ ✅ completed 2026-04-24
+7. canvas and library polish ← **START HERE**
+8. Windows CI
 
 ## Stop Conditions
 

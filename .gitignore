@@ -16,6 +16,10 @@ CTestTestfile.cmake
 *.swp
 *~
 
+# AI agent working directories
+.superpowers/
+**/.superpowers/
+
 # OS
 .DS_Store
 Thumbs.db

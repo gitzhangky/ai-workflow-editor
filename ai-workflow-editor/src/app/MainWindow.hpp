@@ -63,9 +63,11 @@ private:
     QWidget *_nodeLibraryPanel;
     NodeLibraryListWidget *_nodeLibraryList;
     QLineEdit *_nodeLibrarySearchEdit;
+    QLabel *_noSearchResultsLabel;
     InspectorPanel *_inspectorPanel;
     QtNodesEditorWidget *_editorWidget;
     QLabel *_selectionValidationSummaryLabel;
+    QLabel *_zoomIndicatorLabel;
     QAction *_newAction;
     QAction *_openAction;
     QAction *_saveAction;

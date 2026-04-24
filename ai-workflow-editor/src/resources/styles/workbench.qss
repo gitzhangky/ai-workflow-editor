@@ -304,3 +304,18 @@ QLabel#selectionValidationSummaryLabel {
     font-weight: 500;
     padding-right: 6px;
 }
+
+QLabel#zoomIndicatorLabel {
+    background: #efe7d8;
+    border: 1px solid #ddd2c2;
+    border-radius: 8px;
+    color: #5a4d40;
+    font-weight: 600;
+    min-width: 42px;
+    padding: 2px 8px;
+}
+
+QLabel#noSearchResultsLabel {
+    color: #8a7d70;
+    padding: 20px 12px;
+}

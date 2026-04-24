@@ -56,6 +56,7 @@ public:
     std::vector<QtNodes::NodeId> selectedNodeIds() const;
     int nodeCount() const;
     int connectionCount() const;
+    int zoomPercent() const;
     bool dropPreviewVisible() const;
     bool usesStyledNodePainter() const;
     qreal styledNodeCornerRadius() const;
@@ -98,6 +99,7 @@ Q_SIGNALS:
     void workflowModified();
     void cleanStateChanged(bool clean);
     void interactionStateChanged();
+    void zoomLevelChanged(int zoomPercent);
 
 protected:
     void changeEvent(QEvent *event) override;

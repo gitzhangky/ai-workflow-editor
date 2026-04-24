@@ -29,6 +29,8 @@ public:
     static constexpr int ItemKindRole = Qt::UserRole + 2;
     static constexpr int SectionCollapsedRole = Qt::UserRole + 3;
     static constexpr int CardVisualStateRole = Qt::UserRole + 4;
+    static constexpr int InPortCountRole = Qt::UserRole + 5;
+    static constexpr int OutPortCountRole = Qt::UserRole + 6;
 
     explicit NodeLibraryListWidget(QWidget *parent = nullptr);
     static QPixmap dragPreviewPixmap();
@@ -41,9 +43,12 @@ public:
     QListWidgetItem *addNodeEntry(QString const &typeKey,
                                   QString const &displayName,
                                   QString const &description,
-                                  QIcon const &icon);
+                                  QIcon const &icon,
+                                  int inPortCount = 0,
+                                  int outPortCount = 0);
     void setFilterText(QString const &filterText);
     QString filterText() const;
+    int visibleNodeCount() const;
     void toggleSection(QListWidgetItem *headerItem);
 
 protected:

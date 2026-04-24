@@ -177,6 +177,9 @@ private slots:
     void restoresDirtyStateWhenUndoAndRedoCrossSavedNodeDeletion();
     void restoresDirtyStateWhenUndoAndRedoCrossSavedConnectionCreation();
     void restoresDirtyStateWhenUndoAndRedoCrossSavedConnectionDeletion();
+    void showsZoomIndicatorInStatusBar();
+    void nodeLibraryShowsPortCountBadges();
+    void nodeLibraryShowsNoResultsWhenFilterHasNoMatch();
 };
 
 void MainWindowTests::initTestCase()
@@ -3069,6 +3072,73 @@ void MainWindowTests::restoresDirtyStateWhenUndoAndRedoCrossSavedConnectionDelet
     QVERIFY(window.isDirty());
     QVERIFY(window.windowTitle().startsWith("*"));
     QCOMPARE(editor->connectionCount(), 0);
+}
+
+void MainWindowTests::showsZoomIndicatorInStatusBar()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *zoomLabel = window.findChild<QLabel *>("zoomIndicatorLabel");
+    QVERIFY(zoomLabel != nullptr);
+    QVERIFY(!zoomLabel->text().isEmpty());
+    QVERIFY(zoomLabel->text().contains('%'));
+}
+
+void MainWindowTests::nodeLibraryShowsPortCountBadges()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *list = window.findChild<NodeLibraryListWidget *>("nodeLibraryList");
+    QVERIFY(list != nullptr);
+
+    bool foundPortCounts = false;
+    for (int row = 0; row < list->count(); ++row) {
+        auto *item = list->item(row);
+        if (item->data(NodeLibraryListWidget::ItemKindRole).toInt()
+            != static_cast<int>(NodeLibraryListWidget::ItemKind::NodeEntry)) {
+            continue;
+        }
+
+        const int inPorts = item->data(NodeLibraryListWidget::InPortCountRole).toInt();
+        const int outPorts = item->data(NodeLibraryListWidget::OutPortCountRole).toInt();
+        if (inPorts > 0 || outPorts > 0)
+            foundPortCounts = true;
+    }
+
+    QVERIFY(foundPortCounts);
+}
+
+void MainWindowTests::nodeLibraryShowsNoResultsWhenFilterHasNoMatch()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *searchEdit = window.findChild<QLineEdit *>("nodeLibrarySearchEdit");
+    auto *noResultsLabel = window.findChild<QLabel *>("noSearchResultsLabel");
+    auto *list = window.findChild<NodeLibraryListWidget *>("nodeLibraryList");
+    QVERIFY(searchEdit != nullptr);
+    QVERIFY(noResultsLabel != nullptr);
+    QVERIFY(list != nullptr);
+
+    QVERIFY(!noResultsLabel->isVisible());
+
+    searchEdit->setText("zzz_nonexistent_node_type_zzz");
+    QCoreApplication::processEvents();
+    QCOMPARE(list->visibleNodeCount(), 0);
+    QVERIFY(noResultsLabel->isVisible());
+
+    searchEdit->clear();
+    QCoreApplication::processEvents();
+    QVERIFY(!noResultsLabel->isVisible());
+    QVERIFY(list->visibleNodeCount() > 0);
 }
 
 QTEST_MAIN(MainWindowTests)

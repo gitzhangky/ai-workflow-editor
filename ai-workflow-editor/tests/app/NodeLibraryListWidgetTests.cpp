@@ -27,6 +27,8 @@ private slots:
     void usesSlimFlatScrollIndicatorGeometry();
     void showsScrollIndicatorOnlyWhileHoveredWhenContentOverflows();
     void keepsScrollIndicatorHiddenWithoutOverflow();
+    void storesPortCountsOnNodeEntries();
+    void reportsVisibleNodeCount();
 };
 
 void NodeLibraryListWidgetTests::usesTransparentDragPreviewPixmap()
@@ -252,6 +254,35 @@ void NodeLibraryListWidgetTests::keepsScrollIndicatorHiddenWithoutOverflow()
     QApplication::sendEvent(widget->viewport(), &enterEvent);
     QTest::qWait(10);
     QVERIFY(!overlay->isVisible());
+}
+
+void NodeLibraryListWidgetTests::storesPortCountsOnNodeEntries()
+{
+    NodeLibraryListWidget widget;
+    widget.addSectionHeader("Test", QIcon());
+    auto *item = widget.addNodeEntry("test", "Test Node", "A test node", QIcon(), 2, 3);
+
+    QCOMPARE(item->data(NodeLibraryListWidget::InPortCountRole).toInt(), 2);
+    QCOMPARE(item->data(NodeLibraryListWidget::OutPortCountRole).toInt(), 3);
+}
+
+void NodeLibraryListWidgetTests::reportsVisibleNodeCount()
+{
+    NodeLibraryListWidget widget;
+    widget.addSectionHeader("Group", QIcon());
+    widget.addNodeEntry("alpha", "Alpha", "Alpha node", QIcon(), 1, 1);
+    widget.addNodeEntry("beta", "Beta", "Beta node", QIcon(), 0, 1);
+
+    QCOMPARE(widget.visibleNodeCount(), 2);
+
+    widget.setFilterText("Alpha");
+    QCOMPARE(widget.visibleNodeCount(), 1);
+
+    widget.setFilterText("zzz_no_match_zzz");
+    QCOMPARE(widget.visibleNodeCount(), 0);
+
+    widget.setFilterText("");
+    QCOMPARE(widget.visibleNodeCount(), 2);
 }
 
 QTEST_MAIN(NodeLibraryListWidgetTests)

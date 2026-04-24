@@ -172,6 +172,7 @@
     <message><source>Delete</source><translation>删除</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>
     <message><source>%1: Passed validation</source><translation>%1：已通过检查</translation></message>
+    <message><source>No matching nodes found</source><translation>未找到匹配的节点</translation></message>
     <message><source>Unsaved Changes</source><translation>未保存的更改</translation></message>
     <message><source>The current workflow has unsaved changes.
 Do you want to save before continuing?</source><translation>当前工作流有未保存的更改。

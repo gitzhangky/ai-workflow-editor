@@ -174,6 +174,32 @@ public:
                           painter->fontMetrics().elidedText(index.data(Qt::ToolTipRole).toString(),
                                                             Qt::ElideRight,
                                                             static_cast<int>(detailRect.width())));
+
+        const int inPorts = index.data(NodeLibraryListWidget::InPortCountRole).toInt();
+        const int outPorts = index.data(NodeLibraryListWidget::OutPortCountRole).toInt();
+        if (inPorts > 0 || outPorts > 0) {
+            const QString portText = QStringLiteral("%1→%2").arg(inPorts).arg(outPorts);
+            QFont badgeFont = option.font;
+            badgeFont.setPointSizeF(badgeFont.pointSizeF() - 2.0);
+            badgeFont.setBold(true);
+            painter->setFont(badgeFont);
+            const QFontMetricsF badgeMetrics(badgeFont);
+            const qreal textWidth = badgeMetrics.horizontalAdvance(portText);
+            const qreal badgeWidth = textWidth + 10.0;
+            const qreal badgeHeight = 16.0;
+            QRectF badgeRect(rect.right() - badgeWidth - 10.0,
+                             rect.top() + 10.0,
+                             badgeWidth,
+                             badgeHeight);
+            QPainterPath badgePath;
+            badgePath.addRoundedRect(badgeRect, 4.0, 4.0);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(QColor(QStringLiteral("#efe7d8")));
+            painter->drawPath(badgePath);
+            painter->setPen(QColor(QStringLiteral("#7a6b5e")));
+            painter->drawText(badgeRect, Qt::AlignCenter, portText);
+        }
+
         painter->restore();
     }
 
@@ -406,16 +432,33 @@ QListWidgetItem *NodeLibraryListWidget::addSectionHeader(QString const &title, Q
 QListWidgetItem *NodeLibraryListWidget::addNodeEntry(QString const &typeKey,
                                                      QString const &displayName,
                                                      QString const &description,
-                                                     QIcon const &icon)
+                                                     QIcon const &icon,
+                                                     int inPortCount,
+                                                     int outPortCount)
 {
     auto *item = new QListWidgetItem(icon, displayName, this);
     item->setData(NodeTypeRole, typeKey);
     item->setData(ItemKindRole, static_cast<int>(ItemKind::NodeEntry));
     item->setToolTip(description);
     item->setData(CardVisualStateRole, static_cast<int>(CardVisualState::NodeBottom));
+    item->setData(InPortCountRole, inPortCount);
+    item->setData(OutPortCountRole, outPortCount);
     item->setSizeHint(QSize(0, 56));
     queueScrollIndicatorRefresh();
     return item;
+}
+
+int NodeLibraryListWidget::visibleNodeCount() const
+{
+    int count = 0;
+    for (int row = 0; row < this->count(); ++row) {
+        auto *item = this->item(row);
+        if (!item->isHidden()
+            && item->data(ItemKindRole).toInt() == static_cast<int>(ItemKind::NodeEntry)) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 void NodeLibraryListWidget::setFilterText(QString const &filterText)

@@ -70,6 +70,7 @@ Target names for selective builds:
 | App shell, menus, toolbar, docks | `src/app/MainWindow.hpp/.cpp` |
 | Node canvas, drag/drop, save/load, dirty state signaling | `src/qtnodes/QtNodesEditorWidget.hpp/.cpp` |
 | Inspector (property editing) | `src/inspector/InspectorPanel.hpp/.cpp` |
+| Inspector field/section schemas | `src/inspector/InspectorFieldSchema.hpp/.cpp` |
 | Node definitions (types, ports, defaults) | `src/registry/BuiltInNodeRegistry.hpp/.cpp` |
 | Custom node card rendering | `src/qtnodes/StyledNodePainter.hpp/.cpp` |
 | Port positioning | `src/qtnodes/EdgeAlignedNodeGeometry.hpp/.cpp` |
@@ -97,10 +98,10 @@ InspectorPanel (user edits a field)
 ## What Has Been Completed
 
 - [x] Main workbench shell with menus, toolbar, docks
-- [x] 6 built-in node types: start, prompt, llm, tool, condition, output
+- [x] 13 built-in node types: start, prompt, llm, agent, memory, retriever, templateVariables, httpRequest, jsonTransform, tool, condition, chatOutput, output
 - [x] Drag/drop from library to canvas with visual preview
 - [x] Custom node card painter and edge-aligned port geometry
-- [x] Type-specific inspector for prompt, llm, tool
+- [x] Type-specific inspector for all node types via InspectorFieldSchema
 - [x] JSON save/load with full property round-trip
 - [x] Runtime Chinese/English language switching
 - [x] Grouped node library with search and collapse
@@ -111,19 +112,24 @@ InspectorPanel (user edits a field)
 - [x] **Delete selected node/connection** — via Edit menu, keyboard shortcuts (Delete/Backspace), and right-click context menu
 - [x] **Right-click context menu** — delete node, delete connection, select all
 - [x] **Keyboard shortcuts** — Delete and Backspace to remove selected items
+- [x] **Undo/redo** — full QUndoStack with create, delete, edit commands and merge support
+- [x] **Node-level validation** — inline badges, border color changes, inspector field highlighting
+- [x] **Inspector field schema** — data-driven property field definitions via InspectorFieldSchema
+- [x] **Expanded node set** — agent, memory, retriever, templateVariables, httpRequest, jsonTransform, chatOutput with SVG icons
 
 ## What To Build Next
 
 See `docs/plans/2026-04-22-next-development-plan.md` for full details. The recommended
-immediate task sequence (items 1–4 are done):
+immediate task sequence (items 1–6 are done):
 
 1. ~~dirty-state tracking~~ ✅
 2. ~~close/open unsaved confirmation~~ ✅
 3. ~~recent files menu~~ ✅
 4. ~~delete selected node and connection~~ ✅
-5. **validation markers** ← START HERE
-6. expand built-in node set (agent, memory, retriever, etc.)
-7. Windows CI
+5. ~~validation markers~~ ✅
+6. ~~expand built-in node set~~ ✅
+7. **canvas and library polish** ← START HERE
+8. Windows CI
 
 ## Rules For Agents
 

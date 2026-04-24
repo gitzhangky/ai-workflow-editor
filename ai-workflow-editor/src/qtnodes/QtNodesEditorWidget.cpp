@@ -387,6 +387,10 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
         Q_EMIT interactionStateChanged();
     });
 
+    connect(_view, &QtNodes::GraphicsView::scaleChanged, this, [this](double scale) {
+        Q_EMIT zoomLevelChanged(static_cast<int>(std::round(scale * 100.0)));
+    });
+
     auto *deleteShortcut = new QShortcut(QKeySequence::Delete, this);
     connect(deleteShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
 
@@ -625,6 +629,11 @@ std::vector<QtNodes::NodeId> QtNodesEditorWidget::selectedNodeIds() const
 int QtNodesEditorWidget::nodeCount() const
 {
     return static_cast<int>(_nodeStates.size());
+}
+
+int QtNodesEditorWidget::zoomPercent() const
+{
+    return static_cast<int>(std::round(_view->transform().m11() * 100.0));
 }
 
 int QtNodesEditorWidget::connectionCount() const

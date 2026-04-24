@@ -167,7 +167,13 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _nodeLibrarySearchEdit = new QLineEdit(_nodeLibraryPanel);
     _nodeLibrarySearchEdit->setObjectName("nodeLibrarySearchEdit");
     nodeLibraryLayout->addWidget(_nodeLibrarySearchEdit);
+    _noSearchResultsLabel = new QLabel(_nodeLibraryPanel);
+    _noSearchResultsLabel->setObjectName("noSearchResultsLabel");
+    _noSearchResultsLabel->setAlignment(Qt::AlignCenter);
+    _noSearchResultsLabel->setWordWrap(true);
+    _noSearchResultsLabel->hide();
     nodeLibraryLayout->addWidget(_nodeLibraryList, 1);
+    nodeLibraryLayout->addWidget(_noSearchResultsLabel);
     _nodeLibraryDock->setWidget(_nodeLibraryPanel);
     addDockWidget(Qt::LeftDockWidgetArea, _nodeLibraryDock);
     _toggleNodeLibraryAction->setChecked(true);
@@ -186,6 +192,11 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _selectionValidationSummaryLabel->setObjectName("selectionValidationSummaryLabel");
     statusBar()->addPermanentWidget(_selectionValidationSummaryLabel, 1);
 
+    _zoomIndicatorLabel = new QLabel(statusBar());
+    _zoomIndicatorLabel->setObjectName("zoomIndicatorLabel");
+    _zoomIndicatorLabel->setText(QStringLiteral("100%"));
+    statusBar()->addPermanentWidget(_zoomIndicatorLabel);
+
     connect(_nodeLibraryList, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item) {
         addNodeFromType(item->data(NodeLibraryListWidget::NodeTypeRole).toString());
     });
@@ -196,7 +207,11 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             _nodeLibraryList->toggleSection(item);
         }
     });
-    connect(_nodeLibrarySearchEdit, &QLineEdit::textChanged, _nodeLibraryList, &NodeLibraryListWidget::setFilterText);
+    connect(_nodeLibrarySearchEdit, &QLineEdit::textChanged, this, [this](QString const &text) {
+        _nodeLibraryList->setFilterText(text);
+        const bool noResults = !text.trimmed().isEmpty() && _nodeLibraryList->visibleNodeCount() == 0;
+        _noSearchResultsLabel->setVisible(noResults);
+    });
 
     connect(_editorWidget,
             &QtNodesEditorWidget::dropPreviewMessageChanged,
@@ -240,6 +255,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             _editorWidget,
             &QtNodesEditorWidget::setSelectedNodeProperty);
 
+    connect(_editorWidget, &QtNodesEditorWidget::zoomLevelChanged, this, [this](int zoomPercent) {
+        _zoomIndicatorLabel->setText(QStringLiteral("%1%").arg(zoomPercent));
+    });
     connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::markDirty);
     connect(_editorWidget, &QtNodesEditorWidget::cleanStateChanged, this, [this](bool clean) {
         if (clean)
@@ -428,7 +446,9 @@ void MainWindow::populateNodeLibrary()
             _nodeLibraryList->addNodeEntry(definition.typeKey,
                                            definition.displayName,
                                            definition.description,
-                                           nodeLibraryIcon(definition.typeKey));
+                                           nodeLibraryIcon(definition.typeKey),
+                                           definition.inputPorts.size(),
+                                           definition.outputPorts.size());
         }
     }
 
@@ -477,6 +497,7 @@ void MainWindow::retranslateUi()
             _languageManager != nullptr && _languageManager->currentLanguage() == LanguageManager::Language::English
                 ? QStringLiteral("Search Nodes")
                 : QString::fromUtf8("搜索节点"));
+    _noSearchResultsLabel->setText(tr("No matching nodes found"));
     statusBar()->showMessage(tr("Ready"));
 
     _fileMenu->clear();
