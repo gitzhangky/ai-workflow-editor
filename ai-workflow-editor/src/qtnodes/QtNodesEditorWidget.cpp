@@ -3,6 +3,7 @@
 #include "qtnodes/WorkflowGraphModel.hpp"
 
 #include "app/NodeLibraryListWidget.hpp"
+#include "qtnodes/CanvasMiniMapWidget.hpp"
 #include "qtnodes/EdgeAlignedNodeGeometry.hpp"
 #include "qtnodes/StaticNodeDelegateModel.hpp"
 #include "qtnodes/StyledNodePainter.hpp"
@@ -34,9 +35,11 @@
 #include <QMouseEvent>
 #include <QPointF>
 #include <QShortcut>
+#include <QScrollBar>
 #include <QTimer>
 #include <QApplication>
 #include <QClipboard>
+#include <QResizeEvent>
 #include <QUndoCommand>
 #include <QUndoStack>
 #include <QVBoxLayout>
@@ -49,6 +52,7 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
     , _graphModel(std::make_unique<WorkflowGraphModel>(_registry))
     , _scene(new QtNodes::DataFlowGraphicsScene(*_graphModel, this))
     , _view(new QtNodes::GraphicsView(_scene))
+    , _miniMap(new CanvasMiniMapWidget(_view, this))
     , _dropPreview(new QFrame(_view->viewport()))
     , _selectedNodeId(QtNodes::InvalidNodeId)
     , _connectionFeedbackActive(false)
@@ -66,6 +70,8 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
 
     _scene->setNodeGeometry(std::make_unique<EdgeAlignedNodeGeometry>(*_graphModel));
     _scene->setNodePainter(std::make_unique<StyledNodePainter>());
+
+    _miniMap->hide();
 
     _dropPreview->setObjectName("dropPreviewIndicator");
     _dropPreview->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -89,11 +95,25 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
         }
 
         Q_EMIT interactionStateChanged();
+        scheduleMiniMapUpdate();
     });
+
+    connect(_scene, &QGraphicsScene::changed, this, [this](QList<QRectF> const &) { scheduleMiniMapUpdate(); });
+    connect(_scene,
+            &QtNodes::BasicGraphicsScene::modified,
+            this,
+            [this](QtNodes::BasicGraphicsScene *) { scheduleMiniMapUpdate(); });
+    connect(_scene,
+            &QtNodes::BasicGraphicsScene::nodeMoved,
+            this,
+            [this](QtNodes::NodeId, QPointF const &) { scheduleMiniMapUpdate(); });
 
     connect(_view, &QtNodes::GraphicsView::scaleChanged, this, [this](double scale) {
         Q_EMIT zoomLevelChanged(static_cast<int>(std::round(scale * 100.0)));
+        scheduleMiniMapUpdate();
     });
+    connect(_view->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this](int) { scheduleMiniMapUpdate(); });
+    connect(_view->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int) { scheduleMiniMapUpdate(); });
 
     auto *deleteShortcut = new QShortcut(QKeySequence::Delete, this);
     connect(deleteShortcut, &QShortcut::activated, this, &QtNodesEditorWidget::deleteSelection);
@@ -105,6 +125,9 @@ QtNodesEditorWidget::QtNodesEditorWidget(QWidget *parent)
     connect(_view, &QWidget::customContextMenuRequested, this, [this](QPoint const &pos) {
         showCanvasContextMenu(_view->mapToGlobal(pos));
     });
+
+    layoutMiniMap();
+    updateMiniMap();
 }
 
 QtNodesEditorWidget::~QtNodesEditorWidget() = default;
@@ -160,6 +183,13 @@ bool QtNodesEditorWidget::eventFilter(QObject *watched, QEvent *event)
     }
 
     return QWidget::eventFilter(watched, event);
+}
+
+void QtNodesEditorWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    layoutMiniMap();
+    updateMiniMap();
 }
 
 QtNodes::NodeId QtNodesEditorWidget::createNode(QString const &typeKey, QPointF const &scenePosition)
@@ -264,6 +294,7 @@ void QtNodesEditorWidget::clearWorkflow()
     _selectedNodeId = QtNodes::InvalidNodeId;
     _scene->clearSelection();
     clearDropPreview();
+    updateMiniMap();
     Q_EMIT selectionCleared();
 }
 
@@ -540,6 +571,21 @@ QPointF QtNodesEditorWidget::nodePosition(QtNodes::NodeId nodeId) const
         return {};
 
     return _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
+}
+
+bool QtNodesEditorWidget::miniMapVisible() const
+{
+    return _miniMap != nullptr && _miniMap->isVisible();
+}
+
+QRect QtNodesEditorWidget::miniMapGeometry() const
+{
+    return _miniMap != nullptr ? _miniMap->geometry() : QRect();
+}
+
+QPointF QtNodesEditorWidget::viewportSceneCenter() const
+{
+    return _view != nullptr ? _view->mapToScene(_view->viewport()->rect().center()) : QPointF();
 }
 
 QVariantMap QtNodesEditorWidget::nodeStyle(QtNodes::NodeId nodeId) const
@@ -1654,6 +1700,56 @@ QPointF QtNodesEditorWidget::scenePositionForWidgetPoint(QPoint const &widgetPoi
 QPointF QtNodesEditorWidget::defaultScenePosition() const
 {
     return _view->mapToScene(_view->viewport()->rect().center());
+}
+
+void QtNodesEditorWidget::scheduleMiniMapUpdate()
+{
+    QTimer::singleShot(0, this, [this]() { updateMiniMap(); });
+}
+
+void QtNodesEditorWidget::updateMiniMap()
+{
+    if (_miniMap == nullptr)
+        return;
+
+    auto *miniMap = qobject_cast<CanvasMiniMapWidget *>(_miniMap);
+    if (miniMap == nullptr)
+        return;
+
+    QVector<QRectF> nodeRects;
+    nodeRects.reserve(_nodeStates.size());
+    for (auto const nodeId : sortedNodeIds()) {
+        if (!_graphModel->nodeExists(nodeId))
+            continue;
+
+        const QPointF position = _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
+        const QSize size = _scene->nodeGeometry().size(nodeId);
+        if (!size.isValid())
+            continue;
+
+        nodeRects.append(QRectF(position, size));
+    }
+
+    miniMap->setSceneSnapshot(nodeRects, _view->mapToScene(_view->viewport()->rect()).boundingRect());
+    _miniMap->setVisible(miniMap->hasContent());
+    if (_miniMap->isVisible())
+        _miniMap->raise();
+}
+
+void QtNodesEditorWidget::layoutMiniMap()
+{
+    if (_miniMap == nullptr)
+        return;
+
+    constexpr int width = 176;
+    constexpr int height = 124;
+    constexpr int rightInset = 18;
+    constexpr int bottomInset = 18;
+
+    _miniMap->setGeometry(rect().right() - width - rightInset + 1,
+                          rect().bottom() - height - bottomInset + 1,
+                          width,
+                          height);
 }
 
 std::optional<QtNodesEditorWidget::NodeState> QtNodesEditorWidget::selectedState() const

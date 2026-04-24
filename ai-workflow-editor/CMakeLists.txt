@@ -104,6 +104,7 @@ add_library(ai_workflow_editor_lib
   src/inspector/InspectorFieldSchema.cpp
   src/inspector/InspectorPanel.cpp
   src/registry/BuiltInNodeRegistry.cpp
+  src/qtnodes/CanvasMiniMapWidget.cpp
   src/qtnodes/EdgeAlignedNodeGeometry.cpp
   src/qtnodes/StaticNodeDelegateModel.cpp
   src/qtnodes/QtNodesEditorWidget.cpp

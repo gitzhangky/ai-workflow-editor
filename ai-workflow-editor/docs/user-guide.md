@@ -63,7 +63,7 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 
 ## 界面说明
 
-应用分成 5 个区域：
+应用分成 6 个区域：
 
 1. 顶部菜单栏和工具栏  
    用来新建、打开、保存、撤销、重做、删除、全选、居中，以及切换语言。
@@ -79,6 +79,9 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 
 5. 底部状态栏  
    显示当前选中节点的校验摘要，以及拖拽连线时的即时提示。
+
+6. 右下角缩略图（Mini Map）  
+   当画布上出现节点后，会显示一个缩略导航图，帮助你快速判断当前视口在整张工作流里的位置。点击缩略图中的其他区域，可以快速把主画布移动过去。
 
 ## 快速上手
 

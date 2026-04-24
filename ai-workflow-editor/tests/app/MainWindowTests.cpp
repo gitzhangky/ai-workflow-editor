@@ -94,6 +94,9 @@ private slots:
     void exposesToolbarStylingHooks();
     void exposesStableObjectNamesForWorkbenchChrome();
     void createsMenuBarWithFileViewAndSettingsMenus();
+    void keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty();
+    void showsCanvasMiniMapWhenWorkflowHasNodes();
+    void clickingCanvasMiniMapRecentersLargeCanvas();
     void defaultsWorkbenchTextToChinese();
     void keepsChineseDefaultWhenExternalTranslationFileIsUnavailable();
     void retranslatesWorkbenchTextToEnglishAtRuntime();
@@ -361,6 +364,74 @@ void MainWindowTests::createsMenuBarWithFileViewAndSettingsMenus()
     QCOMPARE(settingsMenu->actions().at(0)->text(), QString::fromUtf8("语言"));
     QVERIFY(settingsMenu->actions().at(0)->menu() != nullptr);
     QCOMPARE(settingsMenu->actions().at(0)->menu()->actions().size(), 2);
+}
+
+void MainWindowTests::keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+    QVERIFY(!editor->miniMapVisible());
+}
+
+void MainWindowTests::showsCanvasMiniMapWhenWorkflowHasNodes()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QCoreApplication::processEvents();
+
+    QVERIFY(editor->miniMapVisible());
+    QVERIFY(editor->miniMapGeometry().isValid());
+    QVERIFY(editor->miniMapGeometry().width() >= 120);
+    QVERIFY(editor->miniMapGeometry().height() >= 80);
+}
+
+void MainWindowTests::clickingCanvasMiniMapRecentersLargeCanvas()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    editor->setNodePosition(startNode, QPointF(0.0, 0.0));
+    editor->setNodePosition(outputNode, QPointF(2400.0, 1600.0));
+    editor->selectNode(startNode);
+    editor->centerSelection();
+    QCoreApplication::processEvents();
+
+    auto *miniMap = window.findChild<QWidget *>("canvasMiniMap");
+    QVERIFY(miniMap != nullptr);
+    QVERIFY(editor->miniMapVisible());
+
+    const QPointF beforeCenter = editor->viewportSceneCenter();
+    const QPoint clickPoint(miniMap->width() - 12, miniMap->height() - 12);
+    QTest::mouseClick(miniMap, Qt::LeftButton, Qt::NoModifier, clickPoint);
+    QCoreApplication::processEvents();
+
+    const QPointF afterCenter = editor->viewportSceneCenter();
+    QVERIFY(afterCenter.x() > beforeCenter.x() + 400.0);
+    QVERIFY(afterCenter.y() > beforeCenter.y() + 250.0);
 }
 
 void MainWindowTests::defaultsWorkbenchTextToChinese()

@@ -14,6 +14,7 @@
 #include <vector>
 
 class QMimeData;
+class QResizeEvent;
 
 namespace QtNodes
 {
@@ -70,6 +71,9 @@ public:
     QPointF portPosition(QtNodes::NodeId nodeId, QtNodes::PortType portType, QtNodes::PortIndex portIndex) const;
     QSize nodeSize(QtNodes::NodeId nodeId) const;
     QPointF nodePosition(QtNodes::NodeId nodeId) const;
+    bool miniMapVisible() const;
+    QRect miniMapGeometry() const;
+    QPointF viewportSceneCenter() const;
     QVariantMap nodeStyle(QtNodes::NodeId nodeId) const;
     QString nodeValidationState(QtNodes::NodeId nodeId) const;
     QString nodeValidationMessage(QtNodes::NodeId nodeId) const;
@@ -111,6 +115,7 @@ Q_SIGNALS:
 protected:
     void changeEvent(QEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
@@ -142,6 +147,9 @@ private:
 
     std::shared_ptr<QtNodes::NodeDelegateModelRegistry> buildRegistry() const;
     void applyWorkbenchStyles();
+    void scheduleMiniMapUpdate();
+    void updateMiniMap();
+    void layoutMiniMap();
     QtNodes::NodeId createNodeInternal(QString const &typeKey, QPointF const &scenePosition = QPointF());
     QtNodes::NodeId restoreNodeInternal(NodeSnapshot const &snapshot);
     bool deleteNodeInternal(QtNodes::NodeId nodeId);
@@ -183,6 +191,7 @@ private:
     std::unique_ptr<QtNodes::DataFlowGraphModel> _graphModel;
     QtNodes::DataFlowGraphicsScene *_scene;
     QtNodes::GraphicsView *_view;
+    QWidget *_miniMap;
     QWidget *_dropPreview;
     mutable QHash<QString, QSize> _previewSizeCache;
     QHash<QtNodes::NodeId, NodeState> _nodeStates;
