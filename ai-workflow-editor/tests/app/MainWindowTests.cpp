@@ -92,6 +92,7 @@ private slots:
     void createsNodeLibraryAndInspectorDocks();
     void createsWorkflowCanvasInCentralArea();
     void opensUserGuideInReusableWorkbenchTab();
+    void userGuideCoversCoreWorkflowTasksWithVisualDiagrams();
     void preservesDockVisibilityPreferenceWhenSwitchingHelpTab();
     void appliesLightWorkbenchCanvasBackground();
     void createsPrimaryToolbarAndStatusBar();
@@ -284,6 +285,37 @@ void MainWindowTests::opensUserGuideInReusableWorkbenchTab()
     helpAction->trigger();
     QCOMPARE(tabs->count(), 2);
     QCOMPARE(tabs->currentIndex(), 1);
+}
+
+void MainWindowTests::userGuideCoversCoreWorkflowTasksWithVisualDiagrams()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
+    auto *helpAction = window.findChild<QAction *>("helpAction");
+    QVERIFY(tabs != nullptr);
+    QVERIFY(helpAction != nullptr);
+
+    helpAction->trigger();
+
+    auto *helpWidget = tabs->widget(1);
+    QVERIFY(helpWidget != nullptr);
+    auto *browser = helpWidget->findChild<QTextBrowser *>("helpDocumentBrowser");
+    QVERIFY(browser != nullptr);
+
+    const QString plainText = browser->toPlainText();
+    QVERIFY(plainText.contains(QString::fromUtf8("图文导览")));
+    QVERIFY(plainText.contains(QString::fromUtf8("5 分钟路线")));
+    QVERIFY(plainText.contains(QString::fromUtf8("开始 → 提示词 → 大模型 → 输出")));
+    QVERIFY(plainText.contains(QString::fromUtf8("连线只允许从输出端口拖到输入端口")));
+    QVERIFY(plainText.contains(QString::fromUtf8("节点出现 warning / error")));
+    QVERIFY(plainText.contains(QString::fromUtf8("新功能必须同步更新帮助文档")));
+
+    QVERIFY(plainText.contains(QString::fromUtf8("顶部工具栏和菜单")));
+    QVERIFY(plainText.contains(QString::fromUtf8("左侧节点库")));
+    QVERIFY(plainText.contains(QString::fromUtf8("最小工作流")));
+    QVERIFY(plainText.contains(QString::fromUtf8("用户提示模板：空")));
 }
 
 void MainWindowTests::preservesDockVisibilityPreferenceWhenSwitchingHelpTab()

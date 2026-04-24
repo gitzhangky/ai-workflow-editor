@@ -3,6 +3,48 @@
 #include <QTextBrowser>
 #include <QVBoxLayout>
 
+namespace
+{
+QString helpCss()
+{
+    return QStringLiteral(
+        "body { color: #3d3529; background: #faf6ef; padding: 26px 42px; line-height: 1.72; }"
+        "h1 { font-size: 24px; color: #4c433b; border-bottom: 2px solid #d8cfbf; padding-bottom: 10px; margin-top: 0; }"
+        "h2 { font-size: 18px; color: #5f5142; margin-top: 30px; border-bottom: 1px solid #e8e0d4; padding-bottom: 5px; }"
+        "h3 { font-size: 14px; color: #715f4f; margin-top: 20px; }"
+        "p, li { font-size: 13px; }"
+        "code { background: #f0e8dc; padding: 2px 5px; border-radius: 3px; font-size: 12px; }"
+        "table { border-collapse: collapse; width: 100%; margin: 12px 0; }"
+        "th { background: #f0e8dc; color: #5b4f3e; text-align: left; padding: 8px 12px; font-size: 13px; }"
+        "td { border-bottom: 1px solid #e8e0d4; padding: 7px 12px; font-size: 13px; vertical-align: top; }"
+        "tr:hover td { background: #f5efe5; }"
+        "kbd { background: #e8e0d4; border: 1px solid #d0c8b8; border-radius: 3px; padding: 1px 6px; font-size: 12px; }"
+        ".hero { background: #fffaf1; border: 1px solid #e1d2bd; border-radius: 14px; padding: 16px 18px; margin: 14px 0 18px; }"
+        ".tip { background: #eef6e8; border-left: 3px solid #8cb878; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 13px; }"
+        ".warning { background: #fff2df; border-left: 3px solid #d69545; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 13px; }"
+        ".help-figure { background: #fffdf9; border: 1px solid #ddd4c6; border-radius: 14px; padding: 14px; margin: 12px 0 18px; }"
+        ".caption { color: #7b6b5a; font-size: 12px; margin-top: 8px; }"
+        ".layout-diagram { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 8px; }"
+        ".diagram-box { background: #f2eadf; border: 1px solid #d8cfbf; border-radius: 9px; padding: 10px; text-align: center; font-weight: 700; color: #5a4d40; }"
+        ".diagram-wide { grid-column: 1 / span 3; background: #edf3fb; border-color: #b8cbe8; }"
+        ".workflow-diagram { white-space: nowrap; }"
+        ".flow-node { display: inline-block; background: #f7f1e7; border: 1px solid #d8c7ac; border-radius: 10px; padding: 8px 12px; margin: 4px 2px; font-weight: 700; }"
+        ".flow-arrow { color: #4b84d9; font-weight: 700; margin: 0 4px; }"
+        ".node-card-demo { width: 260px; border: 1px solid #d8c7ac; border-radius: 12px; background: #fffaf1; overflow: hidden; }"
+        ".node-card-head { background: #e9dcc8; padding: 8px 12px; font-weight: 700; }"
+        ".node-card-body { padding: 10px 12px; font-size: 12px; }"
+        ".badge { display: inline-block; border-radius: 12px; padding: 3px 9px; margin: 3px; font-size: 12px; font-weight: 700; }"
+        ".ok { background: #e5f3dd; color: #4f7a35; }"
+        ".warn { background: #fff1d6; color: #9b6a20; }"
+        ".err { background: #ffe2dd; color: #9c3b2d; }");
+}
+
+QString wrap(QString const &body)
+{
+    return QStringLiteral("<html><head><style>%1</style></head><body>%2</body></html>").arg(helpCss(), body);
+}
+}
+
 HelpDocumentWidget::HelpDocumentWidget(QWidget *parent)
     : QWidget(parent)
     , _browser(new QTextBrowser(this))
@@ -27,212 +69,200 @@ void HelpDocumentWidget::retranslateUi()
 
 QString HelpDocumentWidget::buildHelpContent() const
 {
-    const QString css = QStringLiteral(
-        "body { color: #3d3529; background: #faf6ef; padding: 24px 40px; line-height: 1.7; }"
-        "h1 { font-size: 22px; color: #5b4f3e; border-bottom: 2px solid #d8cfbf; padding-bottom: 8px; margin-top: 0; }"
-        "h2 { font-size: 17px; color: #6b5d4d; margin-top: 28px; border-bottom: 1px solid #e8e0d4; padding-bottom: 4px; }"
-        "h3 { font-size: 14px; color: #7a6c5a; margin-top: 20px; }"
-        "p, li { font-size: 13px; }"
-        "code { background: #f0e8dc; padding: 2px 5px; border-radius: 3px; font-size: 12px; }"
-        "table { border-collapse: collapse; width: 100%; margin: 12px 0; }"
-        "th { background: #f0e8dc; color: #5b4f3e; text-align: left; padding: 8px 12px; font-size: 13px; }"
-        "td { border-bottom: 1px solid #e8e0d4; padding: 7px 12px; font-size: 13px; }"
-        "tr:hover td { background: #f5efe5; }"
-        "kbd { background: #e8e0d4; border: 1px solid #d0c8b8; border-radius: 3px; "
-        "      padding: 1px 6px; font-size: 12px; }"
-        ".tip { background: #eef6e8; border-left: 3px solid #8cb878; padding: 10px 14px; "
-        "       margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 13px; }"
-        ".section-icon { font-size: 16px; margin-right: 6px; }");
+    const bool chinese = tr("Overview") != QStringLiteral("Overview");
 
-    QString html = QStringLiteral("<html><head><style>%1</style></head><body>").arg(css);
+    if (!chinese) {
+        QString html;
+        html += QStringLiteral("<h1>AI Workflow Editor — User Guide</h1>");
+        html += QStringLiteral(
+            "<div class='hero'><b>What this is:</b> a visual authoring tool for AI workflow structure. "
+            "It helps you design, validate, save, reopen, and export workflows. It is not a chat shell, "
+            "not an LLM runtime, and not a generic BPM/low-code system.</div>");
 
-    // Title
-    html += QStringLiteral("<h1>%1</h1>").arg(tr("AI Workflow Editor — User Guide"));
+        html += QStringLiteral("<h2>Illustrated Tour</h2>");
+        html += QStringLiteral(
+            "<div class='help-figure layout-diagram'>"
+            "<div class='diagram-box diagram-wide'>Toolbar and menus: file, edit, view, export, help</div>"
+            "<div class='diagram-box'>Node Library<br/>search, categories, drag nodes</div>"
+            "<div class='diagram-box'>Workflow Canvas<br/>place nodes and connect ports</div>"
+            "<div class='diagram-box'>Inspector<br/>edit node properties and validation hints</div>"
+            "<div class='diagram-box diagram-wide'>Status bar: validation summary, connection feedback, zoom</div>"
+            "<div class='caption'>The canvas is the first tab in the central workspace. The user guide opens as another tab.</div>"
+            "</div>");
 
-    // Overview
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Overview"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("AI Workflow Editor is a visual workflow authoring tool. You can compose "
-           "AI pipelines by dragging nodes onto the canvas, connecting them, and "
-           "configuring properties in the inspector panel. Workflows can be saved as "
-           "JSON files and exported to Python code for multiple frameworks."));
+        html += QStringLiteral("<h2>5-Minute Route</h2>");
+        html += QStringLiteral(
+            "<ol>"
+            "<li>Add <b>Start</b>, <b>Prompt</b>, <b>LLM</b>, and <b>Output</b>.</li>"
+            "<li>Connect them as <code>Start → Prompt → LLM → Output</code>.</li>"
+            "<li>Select Prompt and fill the user template.</li>"
+            "<li>Select LLM and fill the model name.</li>"
+            "<li>Save the workflow, reopen it, then try exporting Python code.</li>"
+            "</ol>");
+        html += QStringLiteral(
+            "<div class='help-figure workflow-diagram'>"
+            "<span class='flow-node'>Start</span><span class='flow-arrow'>→</span>"
+            "<span class='flow-node'>Prompt</span><span class='flow-arrow'>→</span>"
+            "<span class='flow-node'>LLM</span><span class='flow-arrow'>→</span>"
+            "<span class='flow-node'>Output</span>"
+            "<div class='caption'>Minimal workflow: Start → Prompt → LLM → Output.</div>"
+            "</div>");
 
-    // Interface Layout
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Interface Layout"));
+        html += QStringLiteral("<h2>Core Rules</h2>");
+        html += QStringLiteral(
+            "<ul>"
+            "<li>Connections must be dragged from output ports to input ports.</li>"
+            "<li>Port data types protect the graph from invalid wiring: flow, text, completion, error, and http_response.</li>"
+            "<li>Nodes show warning / error states when required fields are empty or structural links are missing.</li>"
+            "<li>The Inspector highlights the exact field that needs attention.</li>"
+            "</ul>");
+        html += QStringLiteral(
+            "<div class='help-figure'>"
+            "<div class='node-card-demo'><div class='node-card-head'>Prompt</div>"
+            "<div class='node-card-body'>User template: empty<br/><span class='badge warn'>warning</span>"
+            "<span class='badge ok'>connected</span></div></div>"
+            "<div class='caption'>Node cards, Inspector messages, and the status bar all reflect the same validation state.</div>"
+            "</div>");
+
+        html += QStringLiteral("<h2>Node Types</h2>");
+        html += QStringLiteral(
+            "<table><tr><th>Group</th><th>Nodes</th><th>Use</th></tr>"
+            "<tr><td>Flow</td><td>Start, Condition, Output</td><td>Entry, branching, and final result collection.</td></tr>"
+            "<tr><td>AI</td><td>Prompt, LLM, Agent, Memory, Retriever</td><td>Prompting, model calls, agent behavior, and context retrieval.</td></tr>"
+            "<tr><td>Data / Integration</td><td>Template Variables, JSON Transform, HTTP Request, Tool, Chat Output</td><td>Prepare data, call APIs, expose tools, and format responses.</td></tr>"
+            "</table>");
+
+        html += QStringLiteral("<h2>Saving, Loading, and Exporting</h2>");
+        html += QStringLiteral(
+            "<p>Workflows are saved as JSON. The title bar shows <code>*</code> when unsaved changes exist. "
+            "Export is available from <b>File &gt; Export</b>: Python (LangChain), Python (LangGraph), "
+            "Python (CrewAI), and Python Script.</p>"
+            "<div class='tip'>Exports are code skeletons. Use them as starting points and customize them in your own environment.</div>");
+
+        html += QStringLiteral("<h2>Navigation</h2>");
+        html += QStringLiteral(
+            "<ul>"
+            "<li><b>Center</b> focuses the current selection, or fits the graph if nothing is selected.</li>"
+            "<li><b>Fit Workflow</b> always fits the whole graph.</li>"
+            "<li>The mini-map appears when nodes exist. Click or drag it to navigate large canvases.</li>"
+            "<li>Help opens in a reusable central tab and does not consume the node library or Inspector area.</li>"
+            "</ul>");
+
+        html += QStringLiteral("<h2>Keyboard Shortcuts</h2>");
+        html += QStringLiteral(
+            "<table><tr><th>Shortcut</th><th>Action</th></tr>"
+            "<tr><td><kbd>Ctrl/⌘+N</kbd></td><td>New workflow</td></tr>"
+            "<tr><td><kbd>Ctrl/⌘+O</kbd></td><td>Open workflow</td></tr>"
+            "<tr><td><kbd>Ctrl/⌘+S</kbd></td><td>Save workflow</td></tr>"
+            "<tr><td><kbd>Ctrl/⌘+Z</kbd></td><td>Undo</td></tr>"
+            "<tr><td><kbd>Ctrl/⌘+D</kbd></td><td>Duplicate selected nodes</td></tr>"
+            "<tr><td><kbd>Space</kbd></td><td>Center selection</td></tr>"
+            "<tr><td><kbd>Ctrl/⌘+0</kbd></td><td>Fit workflow</td></tr>"
+            "<tr><td><kbd>F1</kbd></td><td>Open User Guide</td></tr>"
+            "</table>");
+
+        html += QStringLiteral("<h2>Documentation Maintenance Rule</h2>");
+        html += QStringLiteral(
+            "<div class='warning'>When a new user-facing feature is developed, the in-app User Guide and "
+            "<code>docs/user-guide.md</code> must be updated in the same change. Tests should cover key menus, "
+            "shortcuts, export formats, and node types so missing help updates are caught early.</div>");
+
+        return wrap(html);
+    }
+
+    QString html;
+    html += QStringLiteral("<h1>AI 工作流编辑器 — 用户指南</h1>");
     html += QStringLiteral(
-        "<table>"
-        "<tr><th>%1</th><th>%2</th></tr>"
-        "<tr><td>%3</td><td>%4</td></tr>"
-        "<tr><td>%5</td><td>%6</td></tr>"
-        "<tr><td>%7</td><td>%8</td></tr>"
-        "<tr><td>%9</td><td>%10</td></tr>"
-        "<tr><td>%11</td><td>%12</td></tr>"
-        "</table>")
-               .arg(tr("Area"), tr("Description"),
-                    tr("Node Library (left panel)"),
-                    tr("Lists all available node types grouped by category. Drag a node onto the canvas or double-click to add it."),
-                    tr("Canvas (center)"),
-                    tr("The main editing area where you build workflows by placing and connecting nodes."),
-                    tr("Inspector (right panel)"),
-                    tr("Shows and edits properties for the currently selected node."),
-                    tr("Toolbar (top)"),
-                    tr("Quick access to file operations, editing actions, and view controls."),
-                    tr("Status Bar (bottom)"),
-                    tr("Displays validation messages and the current zoom level."));
+        "<div class='hero'><b>它是什么：</b>一个用于设计 AI 工作流结构的可视化编排工具。"
+        "它帮助你搭建、校验、保存、重新打开和导出工作流。它不是聊天壳子，不是大模型运行器，也不是通用 BPM / 低代码平台。</div>");
 
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Workbench Tabs"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("The center workspace uses tabs. The Workflow tab contains the canvas. "
-           "The User Guide opens as a separate tab, and future text or preview pages can "
-           "use the same workspace without taking space away from the node library or inspector."));
+    html += QStringLiteral("<h2>图文导览</h2>");
+    html += QStringLiteral(
+        "<div class='help-figure layout-diagram'>"
+        "<div class='diagram-box diagram-wide'>顶部工具栏和菜单：文件、编辑、视图、导出、帮助</div>"
+        "<div class='diagram-box'>左侧节点库<br/>搜索、分组、拖拽节点</div>"
+        "<div class='diagram-box'>中间工作流画布<br/>摆放节点并连接端口</div>"
+        "<div class='diagram-box'>右侧 Inspector<br/>编辑节点属性和查看校验提示</div>"
+        "<div class='diagram-box diagram-wide'>底部状态栏：校验摘要、连线反馈、缩放比例</div>"
+        "<div class='caption'>画布是中央工作区的第一个页签；用户指南会作为另一个页签打开。</div>"
+        "</div>");
 
-    // Node Types
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Node Types"));
-    html += QStringLiteral("<table><tr><th>%1</th><th>%2</th><th>%3</th></tr>").arg(
-        tr("Node"), tr("Category"), tr("Description"));
+    html += QStringLiteral("<h2>5 分钟路线</h2>");
+    html += QStringLiteral(
+        "<ol>"
+        "<li>添加 <b>开始</b>、<b>提示词</b>、<b>大模型</b> 和 <b>输出</b>。</li>"
+        "<li>把它们连成 <code>开始 → 提示词 → 大模型 → 输出</code>。</li>"
+        "<li>选中提示词节点，填写用户提示模板。</li>"
+        "<li>选中大模型节点，填写模型名称。</li>"
+        "<li>保存工作流，重新打开，再尝试导出 Python 代码。</li>"
+        "</ol>");
+    html += QStringLiteral(
+        "<div class='help-figure workflow-diagram'>"
+        "<span class='flow-node'>开始</span><span class='flow-arrow'>→</span>"
+        "<span class='flow-node'>提示词</span><span class='flow-arrow'>→</span>"
+        "<span class='flow-node'>大模型</span><span class='flow-arrow'>→</span>"
+        "<span class='flow-node'>输出</span>"
+        "<div class='caption'>最小工作流：开始 → 提示词 → 大模型 → 输出。</div>"
+        "</div>");
 
-    struct NodeEntry { const char *name; const char *category; const char *desc; };
-    NodeEntry entries[] = {
-        {QT_TR_NOOP("Start"), QT_TR_NOOP("Flow"), QT_TR_NOOP("Entry point of the workflow. Every workflow should begin with a Start node.")},
-        {QT_TR_NOOP("Prompt"), QT_TR_NOOP("AI"), QT_TR_NOOP("Defines a prompt template with system and user messages.")},
-        {QT_TR_NOOP("LLM"), QT_TR_NOOP("AI"), QT_TR_NOOP("Calls a large language model with configurable model name, temperature, and max tokens.")},
-        {QT_TR_NOOP("Agent"), QT_TR_NOOP("AI"), QT_TR_NOOP("An autonomous agent with instructions, model, and tool access.")},
-        {QT_TR_NOOP("Memory"), QT_TR_NOOP("AI"), QT_TR_NOOP("Conversation memory for maintaining chat history across turns.")},
-        {QT_TR_NOOP("Retriever"), QT_TR_NOOP("AI"), QT_TR_NOOP("Retrieves relevant documents from a knowledge base.")},
-        {QT_TR_NOOP("Template Variables"), QT_TR_NOOP("Data"), QT_TR_NOOP("Provides key-value variables as JSON for downstream nodes.")},
-        {QT_TR_NOOP("HTTP Request"), QT_TR_NOOP("Integration"), QT_TR_NOOP("Makes HTTP requests to external APIs.")},
-        {QT_TR_NOOP("JSON Transform"), QT_TR_NOOP("Data"), QT_TR_NOOP("Transforms data using a JSON mapping definition.")},
-        {QT_TR_NOOP("Tool"), QT_TR_NOOP("Integration"), QT_TR_NOOP("Defines a callable tool that agents can use.")},
-        {QT_TR_NOOP("Condition"), QT_TR_NOOP("Flow"), QT_TR_NOOP("Branches the workflow into True/False paths based on a condition.")},
-        {QT_TR_NOOP("Chat Output"), QT_TR_NOOP("Output"), QT_TR_NOOP("Formats and outputs a chat message with a role and template.")},
-        {QT_TR_NOOP("Output"), QT_TR_NOOP("Output"), QT_TR_NOOP("Terminal node that collects the final workflow result.")},
-    };
+    html += QStringLiteral("<h2>核心规则</h2>");
+    html += QStringLiteral(
+        "<ul>"
+        "<li>连线只允许从输出端口拖到输入端口。</li>"
+        "<li>端口类型会保护图结构：flow、text、completion、error、http_response。</li>"
+        "<li>节点出现 warning / error，通常表示必填字段为空、端口缺少连接或 JSON 配置无效。</li>"
+        "<li>Inspector 会高亮真正需要处理的字段，状态栏会给出当前选中节点的摘要。</li>"
+        "</ul>");
+    html += QStringLiteral(
+        "<div class='help-figure'>"
+        "<div class='node-card-demo'><div class='node-card-head'>提示词</div>"
+        "<div class='node-card-body'>用户提示模板：空<br/><span class='badge warn'>warning</span>"
+        "<span class='badge ok'>已连接</span></div></div>"
+        "<div class='caption'>节点卡片、Inspector 和状态栏会显示同一套校验状态。</div>"
+        "</div>");
 
-    for (auto const &e : entries) {
-        html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td><td>%3</td></tr>")
-                    .arg(tr(e.name), tr(e.category), tr(e.desc));
-    }
-    html += QStringLiteral("</table>");
+    html += QStringLiteral("<h2>节点类型</h2>");
+    html += QStringLiteral(
+        "<table><tr><th>分组</th><th>节点</th><th>用途</th></tr>"
+        "<tr><td>流程</td><td>开始、条件、输出</td><td>定义入口、分支和最终结果收集。</td></tr>"
+        "<tr><td>AI</td><td>提示词、大模型、Agent、记忆、检索器</td><td>组织提示词、模型调用、智能体行为和上下文检索。</td></tr>"
+        "<tr><td>数据 / 集成</td><td>模板变量、JSON 转换、HTTP 请求、工具、聊天输出</td><td>准备数据、调用接口、暴露工具并格式化回复。</td></tr>"
+        "</table>");
 
-    // Basic Operations
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Basic Operations"));
+    html += QStringLiteral("<h2>保存、加载与导出</h2>");
+    html += QStringLiteral(
+        "<p>工作流保存为 JSON 文件。窗口标题出现 <code>*</code> 表示有未保存更改。"
+        "导出入口在 <b>文件 &gt; 导出</b>，当前支持 Python (LangChain)、Python (LangGraph)、"
+        "Python (CrewAI) 和 Python 脚本。</p>"
+        "<div class='tip'>导出结果是代码骨架，适合作为开发起点，再到自己的工程里补充真实运行逻辑。</div>");
 
-    html += QStringLiteral("<h3>%1</h3>").arg(tr("Adding Nodes"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Drag a node from the Node Library on the left and drop it onto the canvas. "
-           "You can also double-click a node in the library to add it at the center of the canvas."));
+    html += QStringLiteral("<h2>画布导航</h2>");
+    html += QStringLiteral(
+        "<ul>"
+        "<li><b>居中</b> 会聚焦当前选区；没有选区时适配整张图。</li>"
+        "<li><b>适配全图</b> 总是把完整工作流拉回视野。</li>"
+        "<li><b>画布小地图</b> 会在有节点时出现，点击或拖拽小地图可以快速导航大画布。</li>"
+        "<li>帮助文档会在中央工作区复用页签，不占用节点库和 Inspector 的空间。</li>"
+        "</ul>");
 
-    html += QStringLiteral("<h3>%1</h3>").arg(tr("Connecting Nodes"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Click and drag from an output port (right side of a node) to an input port "
-           "(left side of another node). Connections are only allowed between compatible "
-           "port types. Incompatible ports will show a rejection indicator."));
+    html += QStringLiteral("<h2>快捷键</h2>");
+    html += QStringLiteral(
+        "<table><tr><th>快捷键</th><th>操作</th></tr>"
+        "<tr><td><kbd>Ctrl/⌘+N</kbd></td><td>新建工作流</td></tr>"
+        "<tr><td><kbd>Ctrl/⌘+O</kbd></td><td>打开工作流</td></tr>"
+        "<tr><td><kbd>Ctrl/⌘+S</kbd></td><td>保存工作流</td></tr>"
+        "<tr><td><kbd>Ctrl/⌘+Z</kbd></td><td>撤销</td></tr>"
+        "<tr><td><kbd>Ctrl/⌘+D</kbd></td><td>复制副本</td></tr>"
+        "<tr><td><kbd>Space</kbd></td><td>居中选区</td></tr>"
+        "<tr><td><kbd>Ctrl/⌘+0</kbd></td><td>适配全图</td></tr>"
+        "<tr><td><kbd>F1</kbd></td><td>打开用户指南</td></tr>"
+        "</table>");
 
-    html += QStringLiteral("<h3>%1</h3>").arg(tr("Editing Properties"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Select a node on the canvas to see its properties in the Inspector panel on the right. "
-           "Edit the fields to configure the node. Changes are saved automatically and can be undone."));
+    html += QStringLiteral("<h2>帮助文档维护规则</h2>");
+    html += QStringLiteral(
+        "<div class='warning'>以后开发任何面向用户的新功能必须同步更新帮助文档，包括界面内置帮助文档和 "
+        "<code>docs/user-guide.md</code>。新增节点、菜单、快捷键、导出格式或重要交互时，也要补测试，"
+        "让缺失的帮助文档更新尽早暴露。</div>");
 
-    html += QStringLiteral("<h3>%1</h3>").arg(tr("Deleting Nodes and Connections"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Select a node or connection and press <kbd>Delete</kbd> or <kbd>Backspace</kbd>. "
-           "You can also right-click for a context menu with delete options."));
-
-    // Keyboard Shortcuts
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Keyboard Shortcuts"));
-    html += QStringLiteral("<table><tr><th>%1</th><th>%2</th></tr>").arg(tr("Shortcut"), tr("Action"));
-
-    struct ShortcutEntry { const char *key; const char *action; };
-    ShortcutEntry shortcuts[] = {
-        {"Ctrl+N / ⌘N", QT_TR_NOOP("New workflow")},
-        {"Ctrl+O / ⌘O", QT_TR_NOOP("Open workflow")},
-        {"Ctrl+S / ⌘S", QT_TR_NOOP("Save workflow")},
-        {"Ctrl+Shift+S / ⌘⇧S", QT_TR_NOOP("Save As...")},
-        {"Ctrl+Z / ⌘Z", QT_TR_NOOP("Undo")},
-        {"Ctrl+Shift+Z / ⌘⇧Z", QT_TR_NOOP("Redo")},
-        {"Ctrl+C / ⌘C", QT_TR_NOOP("Copy selected nodes")},
-        {"Ctrl+V / ⌘V", QT_TR_NOOP("Paste nodes")},
-        {"Ctrl+D / ⌘D", QT_TR_NOOP("Duplicate selected nodes")},
-        {"Ctrl+A / ⌘A", QT_TR_NOOP("Select all nodes")},
-        {"Delete / Backspace", QT_TR_NOOP("Delete selected items")},
-        {"Space", QT_TR_NOOP("Center / fit selection in view")},
-    };
-
-    for (auto const &s : shortcuts) {
-        html += QStringLiteral("<tr><td><kbd>%1</kbd></td><td>%2</td></tr>")
-                    .arg(QString::fromUtf8(s.key), tr(s.action));
-    }
-    html += QStringLiteral("</table>");
-
-    // Port Data Types
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Port Data Types"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Each port has a data type that determines which connections are allowed. "
-           "The following types are used:"));
-    html += QStringLiteral("<table><tr><th>%1</th><th>%2</th></tr>").arg(tr("Type"), tr("Description"));
-
-    struct PortTypeEntry { const char *type; const char *desc; };
-    PortTypeEntry portTypes[] = {
-        {QT_TR_NOOP("Flow"), QT_TR_NOOP("General execution flow. Compatible with all other types.")},
-        {QT_TR_NOOP("Text"), QT_TR_NOOP("Text data such as prompts or responses.")},
-        {QT_TR_NOOP("Completion"), QT_TR_NOOP("LLM completion results.")},
-        {QT_TR_NOOP("Error"), QT_TR_NOOP("Error information for exception handling.")},
-        {QT_TR_NOOP("HTTP Response"), QT_TR_NOOP("Response data from HTTP requests.")},
-    };
-
-    for (auto const &pt : portTypes) {
-        html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td></tr>")
-                    .arg(tr(pt.type), tr(pt.desc));
-    }
-    html += QStringLiteral("</table>");
-
-    // Export
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Exporting Workflows"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Use <b>File &gt; Export</b> to generate runnable Python code from your workflow. "
-           "Four export formats are available:"));
-    html += QStringLiteral("<table><tr><th>%1</th><th>%2</th></tr>").arg(tr("Format"), tr("Description"));
-
-    struct ExportEntry { const char *format; const char *desc; };
-    ExportEntry exports[] = {
-        {QT_TR_NOOP("Python (LangChain)"), QT_TR_NOOP("Generates code using LangChain's LCEL pipe syntax with ChatPromptTemplate and ChatOpenAI.")},
-        {QT_TR_NOOP("Python (LangGraph)"), QT_TR_NOOP("Generates a LangGraph StateGraph with typed state, node functions, and edge routing.")},
-        {QT_TR_NOOP("Python (CrewAI)"), QT_TR_NOOP("Maps workflow nodes to CrewAI Agents, Tasks, and Tools with Crew assembly.")},
-        {QT_TR_NOOP("Python Script"), QT_TR_NOOP("Generates a standalone Python script with functions chained in a pipeline.")},
-    };
-
-    for (auto const &ex : exports) {
-        html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td></tr>")
-                    .arg(tr(ex.format), tr(ex.desc));
-    }
-    html += QStringLiteral("</table>");
-
-    html += QStringLiteral("<div class='tip'>%1</div>").arg(
-        tr("Tip: Export generates a code skeleton. You can use it as a starting point "
-           "and customize the generated code in your own development environment."));
-
-    // Saving and Loading
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Saving and Loading"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Workflows are saved as JSON files using <b>File &gt; Save</b>. The window title shows "
-           "an asterisk (*) when there are unsaved changes. The editor will prompt you before "
-           "discarding unsaved work when creating a new workflow, opening another file, or closing "
-           "the application. Recent files are accessible via <b>File &gt; Recent Files</b>."));
-
-    // Validation
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Validation"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("Nodes are validated in real time. Warning badges appear on nodes that have missing "
-           "required fields or unconnected ports. The Inspector panel highlights the specific field "
-           "that needs attention. The status bar shows a summary of the selected node's validation state."));
-
-    // Mini-map
-    html += QStringLiteral("<h2>%1</h2>").arg(tr("Canvas Mini-Map"));
-    html += QStringLiteral("<p>%1</p>").arg(
-        tr("A mini-map overlay appears in the bottom-right corner of the canvas when nodes are present. "
-           "It shows a bird's-eye view of all nodes and the current viewport. Click or drag on the "
-           "mini-map to quickly navigate the canvas."));
-
-    html += QStringLiteral("</body></html>");
-    return html;
+    return wrap(html);
 }
