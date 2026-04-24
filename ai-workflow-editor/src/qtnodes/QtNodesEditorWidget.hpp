@@ -69,6 +69,7 @@ public:
     bool nodeHasGraphicsEffect(QtNodes::NodeId nodeId) const;
     QPointF portPosition(QtNodes::NodeId nodeId, QtNodes::PortType portType, QtNodes::PortIndex portIndex) const;
     QSize nodeSize(QtNodes::NodeId nodeId) const;
+    QPointF nodePosition(QtNodes::NodeId nodeId) const;
     QVariantMap nodeStyle(QtNodes::NodeId nodeId) const;
     QString nodeValidationState(QtNodes::NodeId nodeId) const;
     QString nodeValidationMessage(QtNodes::NodeId nodeId) const;
@@ -89,8 +90,10 @@ public:
     void setSelectedNodeDisplayName(QString const &displayName);
     void setSelectedNodeDescription(QString const &description);
     void setSelectedNodeProperty(QString const &propertyKey, QVariant const &value);
+    void setNodePosition(QtNodes::NodeId nodeId, QPointF const &scenePosition);
     bool saveWorkflow(QString const &filePath) const;
     bool loadWorkflow(QString const &filePath);
+    QJsonObject workflowToJson() const;
 
 Q_SIGNALS:
     void dropPreviewMessageChanged(QString const &message);

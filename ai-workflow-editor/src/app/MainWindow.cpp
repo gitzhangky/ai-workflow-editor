@@ -68,6 +68,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _openAction(nullptr)
     , _saveAction(nullptr)
     , _saveAsAction(nullptr)
+    , _exportMenu(nullptr)
+    , _exportLangChainAction(nullptr)
+    , _exportPythonAction(nullptr)
     , _copyAction(nullptr)
     , _pasteAction(nullptr)
     , _duplicateAction(nullptr)
@@ -118,6 +121,12 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _primaryToolBar->addSeparator();
     _saveAsAction = new QAction(this);
     _saveAsAction->setObjectName("saveAsAction");
+    _exportMenu = new QMenu(this);
+    _exportMenu->setObjectName("exportMenu");
+    _exportLangChainAction = new QAction(this);
+    _exportLangChainAction->setObjectName("exportLangChainAction");
+    _exportPythonAction = new QAction(this);
+    _exportPythonAction->setObjectName("exportPythonAction");
     _copyAction = new QAction(this);
     _copyAction->setObjectName("copyAction");
     _pasteAction = new QAction(this);
@@ -322,6 +331,13 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             saveWorkflowToPath(filePath);
     });
 
+    connect(_exportLangChainAction, &QAction::triggered, this, [this]() {
+        exportWorkflow(WorkflowExporter::Format::PythonLangChain);
+    });
+    connect(_exportPythonAction, &QAction::triggered, this, [this]() {
+        exportWorkflow(WorkflowExporter::Format::PythonScript);
+    });
+
     connect(_copyAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::copySelection);
     connect(_pasteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::pasteClipboard);
     connect(_duplicateAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::duplicateSelection);
@@ -424,6 +440,10 @@ void MainWindow::updateWorkbenchActionStates()
     _deleteAction->setEnabled(_editorWidget->hasSelection());
     _selectAllAction->setEnabled(_editorWidget->hasNodes());
     _centerAction->setEnabled(_editorWidget->hasNodes());
+    const bool hasNodes = _editorWidget->hasNodes();
+    _exportMenu->setEnabled(hasNodes);
+    _exportLangChainAction->setEnabled(hasNodes);
+    _exportPythonAction->setEnabled(hasNodes);
 }
 
 NodeLibraryListWidget *MainWindow::createNodeLibrary()
@@ -483,6 +503,9 @@ void MainWindow::retranslateUi()
     _openAction->setText(tr("Open"));
     _saveAction->setText(tr("Save"));
     _saveAsAction->setText(tr("Save As..."));
+    _exportMenu->setTitle(tr("Export"));
+    _exportLangChainAction->setText(tr("Python (LangChain)"));
+    _exportPythonAction->setText(tr("Python Script"));
     _recentFilesMenu->setTitle(tr("Recent Files"));
     _copyAction->setText(tr("Copy"));
     _pasteAction->setText(tr("Paste"));
@@ -526,6 +549,11 @@ void MainWindow::retranslateUi()
     _fileMenu->addAction(_openAction);
     _fileMenu->addAction(_saveAction);
     _fileMenu->addAction(_saveAsAction);
+    _fileMenu->addSeparator();
+    _exportMenu->clear();
+    _exportMenu->addAction(_exportLangChainAction);
+    _exportMenu->addAction(_exportPythonAction);
+    _fileMenu->addMenu(_exportMenu);
     _fileMenu->addSeparator();
     _fileMenu->addMenu(_recentFilesMenu);
 
@@ -692,4 +720,38 @@ void MainWindow::rebuildRecentFilesMenu()
     }
 
     _recentFilesMenu->setEnabled(!files.isEmpty());
+}
+
+void MainWindow::exportWorkflow(WorkflowExporter::Format format)
+{
+    if (_editorWidget == nullptr || _editorWidget->nodeCount() == 0) {
+        QMessageBox::information(this, tr("Export"), tr("No workflow to export."));
+        return;
+    }
+
+    const auto filePath = QFileDialog::getSaveFileName(
+        this,
+        tr("Export Workflow"),
+        QStringLiteral("workflow.py"),
+        WorkflowExporter::formatFileFilter(format));
+
+    if (filePath.isEmpty())
+        return;
+
+    const auto workflow = _editorWidget->workflowToJson();
+    const auto result = WorkflowExporter::exportWorkflow(workflow, format);
+
+    if (!result.success) {
+        QMessageBox::warning(this, tr("Export Failed"), result.errorMessage);
+        return;
+    }
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QMessageBox::warning(this, tr("Export Failed"), tr("Cannot write to file: %1").arg(filePath));
+        return;
+    }
+
+    file.write(result.code.toUtf8());
+    statusBar()->showMessage(tr("Exported to %1").arg(filePath));
 }

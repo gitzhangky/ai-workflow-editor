@@ -145,6 +145,7 @@ private slots:
     void enablesDeleteActionForSelectedConnections();
     void enforcesConnectionRulesBetweenCompatiblePorts();
     void savesAndLoadsWorkflowJson();
+    void savesAndLoadsNodePositionsAtOrigin();
     void savesAndLoadsMemoryNodeProperties();
     void savesAndLoadsRetrieverNodeProperties();
     void savesAndLoadsTemplateVariablesNodeProperties();
@@ -152,6 +153,7 @@ private slots:
     void savesAndLoadsJsonTransformNodeProperties();
     void savesAndLoadsAgentNodeProperties();
     void savesAndLoadsChatOutputNodeProperties();
+    void preservesMinimumNodeCardSizeAcrossSaveAndLoad();
     void tracksDirtyStateOnEdits();
     void clearsDirtyStateOnSave();
     void clearsDirtyStateOnLoad();
@@ -187,6 +189,9 @@ private slots:
     void duplicatesNodeOnCanvas();
     void allowsCompatiblePortConnections();
     void rejectsIncompatiblePortConnections();
+    void fileMenuContainsExportSubmenu();
+    void exportActionsDisabledWhenNoNodes();
+    void exportActionsEnabledWhenNodesExist();
 };
 
 void MainWindowTests::initTestCase()
@@ -2061,6 +2066,8 @@ void MainWindowTests::savesAndLoadsWorkflowJson()
 
     LanguageManager languageManager;
     MainWindow window(&languageManager);
+    window.show();
+    QCoreApplication::processEvents();
     auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
     QVERIFY(editor != nullptr);
 
@@ -2122,6 +2129,47 @@ void MainWindowTests::savesAndLoadsWorkflowJson()
     QCOMPARE(restoredEditor->selectedNodeProperty("modelName").toString(), QString("demo-model"));
     QCOMPARE(restoredEditor->selectedNodeProperty("temperature").toDouble(), 0.35);
     QCOMPARE(restoredEditor->selectedNodeProperty("maxTokens").toInt(), 4096);
+}
+
+void MainWindowTests::savesAndLoadsNodePositionsAtOrigin()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("workflow-positions.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    const QPointF promptPosition(0.0, 0.0);
+    const QPointF outputPosition(240.0, 160.0);
+    editor->setNodePosition(promptNode, promptPosition);
+    editor->setNodePosition(outputNode, outputPosition);
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    restoredWindow.show();
+    QCoreApplication::processEvents();
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredPromptNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("提示词"));
+    const auto restoredOutputNode = restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("输出"));
+    QVERIFY(restoredPromptNode != QtNodes::InvalidNodeId);
+    QVERIFY(restoredOutputNode != QtNodes::InvalidNodeId);
+
+    QCOMPARE(restoredEditor->nodePosition(restoredPromptNode), promptPosition);
+    QCOMPARE(restoredEditor->nodePosition(restoredOutputNode), outputPosition);
 }
 
 void MainWindowTests::savesAndLoadsMemoryNodeProperties()
@@ -2378,6 +2426,47 @@ void MainWindowTests::savesAndLoadsChatOutputNodeProperties()
     restoredEditor->selectNode(restoredChatOutputNode);
     QCOMPARE(restoredEditor->selectedNodeProperty("messageRole").toString(), QString("assistant"));
     QCOMPARE(restoredEditor->selectedNodeProperty("messageTemplate").toString(), QString("{{agent.final_answer}}"));
+}
+
+void MainWindowTests::preservesMinimumNodeCardSizeAcrossSaveAndLoad()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString workflowPath = QDir(tempDir.path()).filePath("workflow-card-size.json");
+
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *displayNameEdit = window.findChild<QLineEdit *>("inspectorDisplayNameEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(displayNameEdit != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    editor->selectNode(promptNode);
+    displayNameEdit->setText(QString::fromUtf8("一个更长的提示词节点标题"));
+
+    const QSize originalSize = editor->nodeSize(promptNode);
+    QVERIFY(originalSize.width() >= 176);
+    QVERIFY(originalSize.height() >= 96);
+
+    QVERIFY(window.saveWorkflowToPath(workflowPath));
+
+    MainWindow restoredWindow(&languageManager);
+    QVERIFY(restoredWindow.loadWorkflowFromPath(workflowPath));
+
+    auto *restoredEditor = restoredWindow.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(restoredEditor != nullptr);
+
+    const auto restoredPromptNode =
+        restoredEditor->findNodeIdByDisplayName(QString::fromUtf8("一个更长的提示词节点标题"));
+    QVERIFY(restoredPromptNode != QtNodes::InvalidNodeId);
+
+    const QSize restoredSize = restoredEditor->nodeSize(restoredPromptNode);
+    QCOMPARE(restoredSize, originalSize);
+    QVERIFY(restoredSize.width() >= 176);
+    QVERIFY(restoredSize.height() >= 96);
 }
 
 void MainWindowTests::tracksDirtyStateOnEdits()
@@ -3293,6 +3382,59 @@ void MainWindowTests::rejectsIncompatiblePortConnections()
     const auto httpNode = editor->createNode("httpRequest");
     const auto llmNode3 = editor->createNode("llm");
     QVERIFY(!editor->connectNodes(httpNode, 0, llmNode3, 0));
+}
+
+void MainWindowTests::fileMenuContainsExportSubmenu()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *fileMenu = window.findChild<QMenu *>("fileMenu");
+    QVERIFY(fileMenu != nullptr);
+
+    bool foundExport = false;
+    for (auto *action : fileMenu->actions()) {
+        if (action->menu() != nullptr && action->menu()->objectName() == "exportMenu") {
+            foundExport = true;
+            break;
+        }
+    }
+    QVERIFY(foundExport);
+
+    auto *langChainAction = window.findChild<QAction *>("exportLangChainAction");
+    auto *pythonAction = window.findChild<QAction *>("exportPythonAction");
+    QVERIFY(langChainAction != nullptr);
+    QVERIFY(pythonAction != nullptr);
+}
+
+void MainWindowTests::exportActionsDisabledWhenNoNodes()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *langChainAction = window.findChild<QAction *>("exportLangChainAction");
+    auto *pythonAction = window.findChild<QAction *>("exportPythonAction");
+    QVERIFY(langChainAction != nullptr);
+    QVERIFY(pythonAction != nullptr);
+    QVERIFY(!langChainAction->isEnabled());
+    QVERIFY(!pythonAction->isEnabled());
+}
+
+void MainWindowTests::exportActionsEnabledWhenNodesExist()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>();
+    QVERIFY(editor != nullptr);
+    editor->createNode("start");
+
+    auto *langChainAction = window.findChild<QAction *>("exportLangChainAction");
+    auto *pythonAction = window.findChild<QAction *>("exportPythonAction");
+    QVERIFY(langChainAction != nullptr);
+    QVERIFY(pythonAction != nullptr);
+    QVERIFY(langChainAction->isEnabled());
+    QVERIFY(pythonAction->isEnabled());
 }
 
 QTEST_MAIN(MainWindowTests)

@@ -534,6 +534,14 @@ QSize QtNodesEditorWidget::nodeSize(QtNodes::NodeId nodeId) const
     return _scene->nodeGeometry().size(nodeId);
 }
 
+QPointF QtNodesEditorWidget::nodePosition(QtNodes::NodeId nodeId) const
+{
+    if (!_graphModel->nodeExists(nodeId))
+        return {};
+
+    return _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
+}
+
 QVariantMap QtNodesEditorWidget::nodeStyle(QtNodes::NodeId nodeId) const
 {
     if (!_graphModel->nodeExists(nodeId))
@@ -818,7 +826,15 @@ void QtNodesEditorWidget::setSelectedNodeProperty(QString const &propertyKey, QV
         new NodePropertyEditCommand(this, _selectedNodeId, propertyKey, nodeStateIt->properties.value(propertyKey), value));
 }
 
-bool QtNodesEditorWidget::saveWorkflow(QString const &filePath) const
+void QtNodesEditorWidget::setNodePosition(QtNodes::NodeId nodeId, QPointF const &scenePosition)
+{
+    if (!_graphModel->nodeExists(nodeId))
+        return;
+
+    _graphModel->setNodeData(nodeId, QtNodes::NodeRole::Position, scenePosition);
+}
+
+QJsonObject QtNodesEditorWidget::workflowToJson() const
 {
     QJsonObject root;
     root["version"] = 2;
@@ -860,6 +876,13 @@ bool QtNodesEditorWidget::saveWorkflow(QString const &filePath) const
         }
     }
     root["connections"] = connections;
+
+    return root;
+}
+
+bool QtNodesEditorWidget::saveWorkflow(QString const &filePath) const
+{
+    const auto root = workflowToJson();
 
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
@@ -983,6 +1006,9 @@ bool QtNodesEditorWidget::loadWorkflow(QString const &filePath)
             return false;
 
         nodeIdMap.insert(parsedNode.serializedId, nodeId);
+        // Preserve explicit scene coordinates such as (0, 0) instead of falling back
+        // to the default viewport-centered placement used by interactive node creation.
+        _graphModel->setNodeData(nodeId, QtNodes::NodeRole::Position, parsedNode.position);
         _nodeStates[nodeId].displayName = parsedNode.displayName;
         _nodeStates[nodeId].description = parsedNode.description;
         _nodeStates[nodeId].properties = parsedNode.properties;

@@ -66,11 +66,11 @@ The app is a standalone Qt Widgets desktop application built on top of `QtNodes`
 - Grouped node library with search, collapse, port count badges, no-results empty state
 - Zoom indicator in status bar
 - **Cross-platform CI**: GitHub Actions for Linux/Windows/macOS × Qt 5.15/6.5
+- **Workflow export**: File > Export submenu with Python (LangChain) and Python Script formats; topologically-sorted code generation with all 13 node types supported
 
 ### Not implemented yet
 
 - Workflow execution engine
-- Workflow export to executable format (LangChain JSON, Python, etc.)
 - Canvas internal search/filter
 - Node grouping / sub-workflows
 - Multi-node batch operations beyond delete
@@ -93,7 +93,7 @@ The app is a standalone Qt Widgets desktop application built on top of `QtNodes`
 ### App Shell
 
 - `src/main.cpp` — bootstrap, creates LanguageManager, applies LightTheme, shows MainWindow
-- `src/app/MainWindow.hpp/.cpp` (~695 lines) — menus, toolbar, docks, language menu, file actions, dirty-state, recent files, action enablement, copy/paste/duplicate wiring
+- `src/app/MainWindow.hpp/.cpp` (~730 lines) — menus, toolbar, docks, language menu, file actions, dirty-state, recent files, action enablement, copy/paste/duplicate wiring, export workflow
 - `src/app/LanguageManager.hpp/.cpp` — runtime language switching, persisted preference
 - `src/app/LightTheme.hpp/.cpp` — palette and QSS application
 
@@ -121,6 +121,10 @@ The app is a standalone Qt Widgets desktop application built on top of `QtNodes`
 - `src/qtnodes/StyledNodePainter.hpp/.cpp` — custom node card rendering
 - `src/qtnodes/EdgeAlignedNodeGeometry.hpp/.cpp` — port positioning
 
+### Export
+
+- `src/export/WorkflowExporter.hpp/.cpp` — workflow-to-Python code generation; supports LangChain and plain script formats, topological sort, variable name sanitization
+
 ### Resources
 
 - `src/resources/styles/workbench.qss` — light workbench styling
@@ -133,7 +137,8 @@ The app is a standalone Qt Widgets desktop application built on top of `QtNodes`
 - `tests/app/LightThemeTests.cpp` — 3 tests
 - `tests/app/NodeLibraryListWidgetTests.cpp` — 14 tests
 - `tests/domain/BuiltInNodeRegistryTests.cpp` — 10 tests
-- **4/4 test suites, all passing**
+- `tests/export/WorkflowExporterTests.cpp` — 25 tests
+- **5/5 test suites, all passing**
 
 ## Build and Test
 
@@ -160,9 +165,9 @@ To launch:
 
 ## Recommended Next Development Directions
 
-The original 6-phase plan is fully complete. The following directions were identified from an objective assessment:
+The original 6-phase plan and workflow export are complete. The following directions remain:
 
-1. **Workflow export** — allow exporting workflows to executable formats (LangChain JSON, Python code, etc.)
+1. **Additional export formats** — LangGraph, CrewAI, or other framework targets
 2. **Further QtNodesEditorWidget decomposition** — extract WorkflowDocument abstraction for document model + serialization (still ~1711 lines)
 3. **Multi-node operations** — rubber band selection, batch move, alignment
 4. **Node grouping / sub-workflows**

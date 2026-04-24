@@ -82,7 +82,6 @@ void StyledNodePainter::paint(QPainter *painter, QtNodes::NodeGraphicsObject &ng
     drawCard(painter, ngo);
     drawHeader(painter, ngo);
     drawTitle(painter, ngo);
-    drawContentHints(painter, ngo);
     drawValidationBadge(painter, ngo);
     drawPorts(painter, ngo);
 }
@@ -159,10 +158,6 @@ void StyledNodePainter::drawHeader(QPainter *painter, QtNodes::NodeGraphicsObjec
                       headerRect.top());
 
     painter->fillPath(headerPath, headerColor);
-
-    painter->setPen(QPen(QColor(255, 255, 255, 80), 1.0));
-    painter->drawLine(QPointF(headerRect.left() + 12.0, headerRect.bottom()),
-                      QPointF(headerRect.right() - 12.0, headerRect.bottom()));
 
     QFont badgeFont = painter->font();
     badgeFont.setPointSizeF(9.0);

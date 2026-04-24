@@ -99,12 +99,13 @@ Beyond the original A–F phases, the following were also implemented:
 - **Copy/paste/duplicate** — Ctrl+C/V/D, Edit menu, right-click context menu, paste at mouse position
 - **Undo command extraction** — 6 commands moved to UndoCommands.hpp/.cpp (widget 2005→1711 lines)
 - **File format versioning** — version 2, backward-compatible with v1
+- **Workflow export** — File > Export with Python (LangChain) and Python Script formats, topological sort, all 13 node types, 25 unit tests
 
 ## Recommended Next Directions
 
-All original phases are complete. Future development should focus on:
+All original phases and workflow export are complete. Future development should focus on:
 
-1. **Workflow export** — export to LangChain JSON, Python, or other executable formats
+1. **Additional export formats** — LangGraph, CrewAI, etc.
 2. **WorkflowDocument abstraction** — further decompose QtNodesEditorWidget
 3. **Multi-node operations** — rubber band selection, batch move, alignment
 4. **Node grouping / sub-workflows**

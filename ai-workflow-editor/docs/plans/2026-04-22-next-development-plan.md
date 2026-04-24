@@ -263,10 +263,15 @@ After all 8 original plan items were completed, the following additional feature
 12. ~~file format versioning~~ ✅ completed 2026-04-24
     - Save format bumped to version 2
     - Load validates version (accepts 1-2, rejects others)
+13. ~~workflow export~~ ✅ completed 2026-04-24
+    - File > Export submenu with Python (LangChain) and Python Script formats
+    - Topological sort, variable name sanitization, chain assembly detection
+    - All 13 node types generate appropriate Python code
+    - 25 export-specific unit tests
 
 ## Recommended Next Directions
 
-1. **Workflow export** — export to LangChain JSON, Python code, or other executable formats
+1. **Additional export formats** — LangGraph, CrewAI, etc.
 2. **WorkflowDocument abstraction** — further decompose QtNodesEditorWidget (~1711 lines)
 3. **Multi-node operations** — rubber band selection, batch move, alignment
 4. **Node grouping / sub-workflows**

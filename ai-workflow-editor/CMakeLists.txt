@@ -110,6 +110,7 @@ add_library(ai_workflow_editor_lib
   src/qtnodes/UndoCommands.cpp
   src/qtnodes/WorkflowGraphModel.cpp
   src/qtnodes/StyledNodePainter.cpp
+  src/export/WorkflowExporter.cpp
   src/resources/app_theme.qrc
   ${AI_WORKFLOW_EDITOR_TRANSLATIONS_QRC}
 )

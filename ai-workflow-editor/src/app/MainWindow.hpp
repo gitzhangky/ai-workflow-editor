@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/LanguageManager.hpp"
+#include "export/WorkflowExporter.hpp"
 
 #include <QMainWindow>
 #include <QStringList>
@@ -49,6 +50,7 @@ private:
     bool maybeSave();
     void addToRecentFiles(QString const &filePath);
     void rebuildRecentFilesMenu();
+    void exportWorkflow(WorkflowExporter::Format format);
 
     LanguageManager *_languageManager;
     QMenu *_fileMenu;
@@ -72,6 +74,9 @@ private:
     QAction *_openAction;
     QAction *_saveAction;
     QAction *_saveAsAction;
+    QMenu *_exportMenu;
+    QAction *_exportLangChainAction;
+    QAction *_exportPythonAction;
     QAction *_copyAction;
     QAction *_pasteAction;
     QAction *_duplicateAction;

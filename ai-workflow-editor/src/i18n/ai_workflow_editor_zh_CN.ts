@@ -174,6 +174,14 @@
     <message><source>Duplicate</source><translation>复制副本</translation></message>
     <message><source>Delete</source><translation>删除</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>
+    <message><source>Export</source><translation>导出</translation></message>
+    <message><source>Python (LangChain)</source><translation>Python (LangChain)</translation></message>
+    <message><source>Python Script</source><translation>Python 脚本</translation></message>
+    <message><source>Export Workflow</source><translation>导出工作流</translation></message>
+    <message><source>No workflow to export.</source><translation>没有可导出的工作流。</translation></message>
+    <message><source>Export Failed</source><translation>导出失败</translation></message>
+    <message><source>Cannot write to file: %1</source><translation>无法写入文件：%1</translation></message>
+    <message><source>Exported to %1</source><translation>已导出至 %1</translation></message>
     <message><source>%1: Passed validation</source><translation>%1：已通过检查</translation></message>
     <message><source>No matching nodes found</source><translation>未找到匹配的节点</translation></message>
     <message><source>Unsaved Changes</source><translation>未保存的更改</translation></message>

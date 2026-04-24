@@ -34,6 +34,7 @@
 - 节点配置
 - 连线校验
 - JSON 保存 / 加载
+- 导出为 Python (LangChain) / Python 脚本
 - Undo / Redo
 
 当前版本还**不是**：
@@ -246,6 +247,19 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 - 窗口标题会带 `*`
 - 新建 / 打开 / 关闭前会弹确认
 - 你可以选择先保存，再继续操作
+
+### 第 6 步：导出为 Python 代码
+
+工作流可以导出为可执行的 Python 代码。
+
+菜单入口：`文件 -> 导出`
+
+支持两种格式：
+
+- **Python (LangChain)** — 生成使用 LangChain 框架的代码，包含 `ChatPromptTemplate`、`ChatOpenAI`、`AgentExecutor` 等组件，并自动组装 chain
+- **Python 脚本** — 生成纯 Python 函数式代码，每个节点对应一个函数，最后有 `run_workflow()` 串联整个流程
+
+导出的代码包含 `TODO` 注释标记需要补充的实现细节（如工具逻辑、条件判断等）。
 
 ## 当前支持的节点
 

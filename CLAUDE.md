@@ -19,7 +19,8 @@ properties in a side inspector.
 │   ├── src/
 │   │   ├── main.cpp             # Bootstrap: language, theme, window
 │   │   ├── app/                 # Shell: MainWindow, NodeLibrary, LanguageManager, LightTheme
-│   │   ├── domain/              # Data: WorkflowNodeDefinition
+│   │   ├── domain/              # Data: WorkflowNodeDefinition, PortDataTypes
+│   │   ├── export/              # Workflow export: WorkflowExporter (Python/LangChain)
 │   │   ├── inspector/           # Right panel: InspectorPanel (type-specific property forms)
 │   │   ├── qtnodes/             # Adapter layer over QtNodes (editor widget, painter, geometry)
 │   │   ├── registry/            # BuiltInNodeRegistry (node definitions)
@@ -40,7 +41,7 @@ cmake -S ai-workflow-editor -B ai-workflow-editor/build
 # Build everything
 cmake --build ai-workflow-editor/build
 
-# Run all tests (expect 4/4 passing)
+# Run all tests (expect 5/5 passing)
 ctest --test-dir ai-workflow-editor/build --output-on-failure
 ```
 
@@ -50,6 +51,7 @@ Target names for selective builds:
 - `ai_workflow_editor_domain_tests` — domain/registry unit tests
 - `ai_workflow_editor_theme_tests` — theme tests
 - `ai_workflow_editor_widget_tests` — node library widget tests
+- `ai_workflow_editor_export_tests` — workflow export unit tests
 
 ## Key Constraints
 
@@ -73,6 +75,7 @@ Target names for selective builds:
 | Graph model with port type constraints | `src/qtnodes/WorkflowGraphModel.hpp/.cpp` |
 | Port data type definitions and compatibility | `src/domain/PortDataTypes.hpp` |
 | Inspector (property editing) | `src/inspector/InspectorPanel.hpp/.cpp` |
+| Workflow export (Python/LangChain) | `src/export/WorkflowExporter.hpp/.cpp` |
 | Inspector field/section schemas | `src/inspector/InspectorFieldSchema.hpp/.cpp` |
 | Node definitions (types, ports, defaults, port types) | `src/registry/BuiltInNodeRegistry.hpp/.cpp` |
 | Custom node card rendering | `src/qtnodes/StyledNodePainter.hpp/.cpp` |
@@ -128,20 +131,15 @@ InspectorPanel (user edits a field)
 - [x] **WorkflowGraphModel** — custom DataFlowGraphModel subclass enforcing port type compatibility
 - [x] **Undo commands extracted** — moved to `UndoCommands.hpp/.cpp` (QtNodesEditorWidget 2005→1711 lines)
 - [x] **File format versioning** — save format version 2, accepts v1 files with forward compatibility
+- [x] **Workflow export** — export to Python (LangChain) and Python Script formats via File > Export menu
 
 ## What To Build Next
 
-See `docs/plans/2026-04-22-next-development-plan.md` for full details. The recommended
-immediate task sequence (items 1–6 are done):
-
-1. ~~dirty-state tracking~~ ✅
-2. ~~close/open unsaved confirmation~~ ✅
-3. ~~recent files menu~~ ✅
-4. ~~delete selected node and connection~~ ✅
-5. ~~validation markers~~ ✅
-6. ~~expand built-in node set~~ ✅
-7. ~~canvas and library polish~~ ✅
-8. ~~cross-platform CI~~ ✅
+1. **WorkflowDocument abstraction** — further decompose QtNodesEditorWidget (~1711 lines)
+2. **Multi-node operations** — rubber band selection, batch move, alignment
+3. **Node grouping / sub-workflows**
+4. **Canvas mini-map**
+5. **Additional export formats** — LangGraph, CrewAI, etc.
 
 ## Rules For Agents
 
