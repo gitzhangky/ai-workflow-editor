@@ -262,6 +262,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _problemsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     _problemsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     _problemsTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    _problemsTable->setAlternatingRowColors(true);
+    _problemsTable->setMouseTracking(true);
+    _problemsTable->viewport()->setMouseTracking(true);
+    _problemsTable->setShowGrid(false);
     _problemsTable->verticalHeader()->hide();
     _problemsTable->horizontalHeader()->setStretchLastSection(true);
     _problemsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
@@ -328,6 +332,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
             [this](QString const &state, QString const &message, QString const &propertyKey) {
                 _inspectorPanel->setValidationFeedback(state, message, propertyKey);
                 updateSelectionValidationSummary(state, message);
+                updateProblemsPanel();
             });
     connect(_editorWidget, &QtNodesEditorWidget::selectionCleared, this, [this]() {
         _currentSelectedNodeDisplayName.clear();
@@ -580,9 +585,23 @@ void MainWindow::updateProblemsPanel()
         return;
 
     const QSignalBlocker blocker(_problemsTable);
+    int selectedNodeId = static_cast<int>(QtNodes::InvalidNodeId);
+    QString selectedPropertyKey;
+    QString selectedMessage;
+    const int selectedRow = _problemsTable->currentRow();
+    if (selectedRow >= 0) {
+        if (auto *levelItem = _problemsTable->item(selectedRow, 0); levelItem != nullptr) {
+            selectedNodeId = levelItem->data(Qt::UserRole).toInt();
+            selectedPropertyKey = levelItem->data(Qt::UserRole + 1).toString();
+        }
+        if (auto *messageItem = _problemsTable->item(selectedRow, 3); messageItem != nullptr)
+            selectedMessage = messageItem->text();
+    }
+
     const auto issues = _editorWidget->validationIssues();
     _problemsTable->setRowCount(issues.size());
 
+    int rowToSelect = -1;
     for (int row = 0; row < issues.size(); ++row) {
         auto const &issue = issues.at(row);
         auto *levelItem = new QTableWidgetItem(issue.state);
@@ -597,7 +616,23 @@ void MainWindow::updateProblemsPanel()
         _problemsTable->setItem(row, 1, nodeItem);
         _problemsTable->setItem(row, 2, typeItem);
         _problemsTable->setItem(row, 3, messageItem);
+
+        if (static_cast<int>(issue.nodeId) == selectedNodeId && issue.propertyKey == selectedPropertyKey
+            && issue.message == selectedMessage) {
+            rowToSelect = row;
+        }
     }
+
+    if (rowToSelect >= 0) {
+        _problemsTable->selectRow(rowToSelect);
+        _problemsTable->setCurrentCell(rowToSelect, 0);
+    } else {
+        _problemsTable->clearSelection();
+        _problemsTable->setCurrentCell(-1, -1);
+    }
+
+    _problemsTable->resizeRowsToContents();
+    _problemsTable->viewport()->update();
 }
 
 void MainWindow::activateProblemRow(int row)

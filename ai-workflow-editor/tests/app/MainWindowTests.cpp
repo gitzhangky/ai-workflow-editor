@@ -107,6 +107,7 @@ private slots:
     void showsProblemsPanelWithWorkflowValidationIssues();
     void activatingProblemSelectsNodeAndHighlightsInspectorField();
     void problemsPanelRefreshesAfterIssueIsFixed();
+    void problemsPanelRefreshesAfterTypingFixInInspector();
     void keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty();
     void showsCanvasMiniMapWhenWorkflowHasNodes();
     void clickingCanvasMiniMapRecentersLargeCanvas();
@@ -586,6 +587,10 @@ void MainWindowTests::showsProblemsPanelWithWorkflowValidationIssues()
 
     QCOMPARE(problemsDock->windowTitle(), QString::fromUtf8("问题"));
     QCOMPARE(problemsTable->rowCount(), 0);
+    QVERIFY(problemsTable->hasMouseTracking());
+    QVERIFY(problemsTable->viewport()->hasMouseTracking());
+    QVERIFY(problemsTable->alternatingRowColors());
+    QVERIFY(!problemsTable->showGrid());
 
     editor->createNode("prompt");
     editor->createNode("output");
@@ -638,6 +643,7 @@ void MainWindowTests::activatingProblemSelectsNodeAndHighlightsInspectorField()
     QTest::mouseClick(problemsTable->viewport(), Qt::LeftButton, Qt::NoModifier, activationPoint);
     QCoreApplication::processEvents();
 
+    QCOMPARE(problemsTable->currentRow(), promptProblemRow);
     QCOMPARE(editor->selectedNodeDisplayName(), QString::fromUtf8("提示词"));
     QCOMPARE(promptUserLabel->property("validationState").toString(), QString("warning"));
 
@@ -667,6 +673,34 @@ void MainWindowTests::problemsPanelRefreshesAfterIssueIsFixed()
     promptUserEdit->setPlainText("Summarize {{input}}");
     QCoreApplication::processEvents();
 
+    QCOMPARE(problemsTable->rowCount(), 0);
+}
+
+void MainWindowTests::problemsPanelRefreshesAfterTypingFixInInspector()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsTable != nullptr);
+    QVERIFY(promptUserEdit != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    editor->selectNode(promptNode);
+    QCoreApplication::processEvents();
+    QCOMPARE(problemsTable->rowCount(), 1);
+
+    promptUserEdit->setFocus();
+    QVERIFY(promptUserEdit->hasFocus());
+    QTest::keyClicks(promptUserEdit, "Summarize {{input}}");
+    QCoreApplication::processEvents();
+
+    QVERIFY(!editor->selectedNodeProperty("userPromptTemplate").toString().trimmed().isEmpty());
     QCOMPARE(problemsTable->rowCount(), 0);
 }
 
