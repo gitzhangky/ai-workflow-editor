@@ -102,12 +102,16 @@ private slots:
     void exposesToolbarStylingHooks();
     void exposesStableObjectNamesForWorkbenchChrome();
     void createsMenuBarWithFileViewAndSettingsMenus();
+    void exposesCanvasArrangeActionsForMultiSelection();
     void keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty();
     void showsCanvasMiniMapWhenWorkflowHasNodes();
     void clickingCanvasMiniMapRecentersLargeCanvas();
     void draggingCanvasMiniMapViewportPansWithoutInitialJump();
     void updatesCanvasMiniMapWhenNodeGraphicsMove();
+    void commitsMovedNodeGraphicsPositionWithUndoRedoOnMouseRelease();
     void fitWorkflowActionShowsEntireLargeWorkflow();
+    void alignsSelectedNodesLeftWithUndoRedo();
+    void distributesSelectedNodesHorizontallyWithUndoRedo();
     void defaultsWorkbenchTextToChinese();
     void keepsChineseDefaultWhenExternalTranslationFileIsUnavailable();
     void retranslatesWorkbenchTextToEnglishAtRuntime();
@@ -312,6 +316,9 @@ void MainWindowTests::userGuideCoversCoreWorkflowTasksWithVisualDiagrams()
     QVERIFY(plainText.contains(QString::fromUtf8("开始 → 提示词 → 大模型 → 输出")));
     QVERIFY(plainText.contains(QString::fromUtf8("连线只允许从输出端口拖到输入端口")));
     QVERIFY(plainText.contains(QString::fromUtf8("节点出现 warning / error")));
+    QVERIFY(plainText.contains(QString::fromUtf8("视图 > 整理")));
+    QVERIFY(plainText.contains(QString::fromUtf8("左对齐 / 右对齐 / 顶部对齐 / 底部对齐")));
+    QVERIFY(plainText.contains(QString::fromUtf8("水平分布 / 垂直分布")));
     QVERIFY(plainText.contains(QString::fromUtf8("新功能必须同步更新帮助文档")));
 
     QVERIFY(plainText.contains(QString::fromUtf8("顶部工具栏和菜单")));
@@ -507,6 +514,44 @@ void MainWindowTests::createsMenuBarWithFileViewAndSettingsMenus()
     QCOMPARE(helpMenu->actions().at(0)->text(), QString::fromUtf8("用户指南"));
 }
 
+void MainWindowTests::exposesCanvasArrangeActionsForMultiSelection()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *alignLeftAction = window.findChild<QAction *>("alignLeftAction");
+    auto *distributeHorizontalAction = window.findChild<QAction *>("distributeHorizontalAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(alignLeftAction != nullptr);
+    QVERIFY(distributeHorizontalAction != nullptr);
+
+    QVERIFY(!alignLeftAction->isEnabled());
+    QVERIFY(!distributeHorizontalAction->isEnabled());
+
+    const auto startNode = editor->createNode("start", QPointF(320.0, 40.0));
+    const auto promptNode = editor->createNode("prompt", QPointF(100.0, 180.0));
+    const auto outputNode = editor->createNode("output", QPointF(240.0, 320.0));
+    editor->markCurrentStateClean();
+
+    selectNodeGraphicsObject(editor, startNode);
+    selectNodeGraphicsObject(editor, promptNode, false);
+    QCoreApplication::processEvents();
+
+    QVERIFY(alignLeftAction->isEnabled());
+    QVERIFY(!distributeHorizontalAction->isEnabled());
+
+    selectNodeGraphicsObject(editor, outputNode, false);
+    QCoreApplication::processEvents();
+
+    QVERIFY(distributeHorizontalAction->isEnabled());
+
+    alignLeftAction->trigger();
+    QCOMPARE(editor->nodePosition(startNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(promptNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(outputNode).x(), 100.0);
+}
+
 void MainWindowTests::keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty()
 {
     LanguageManager languageManager;
@@ -665,6 +710,48 @@ void MainWindowTests::updatesCanvasMiniMapWhenNodeGraphicsMove()
     QVERIFY(afterStartCenter.y() > beforeStartCenter.y() + 20.0);
 }
 
+void MainWindowTests::commitsMovedNodeGraphicsPositionWithUndoRedoOnMouseRelease()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *graphicsView = editor != nullptr ? editor->findChild<QGraphicsView *>() : nullptr;
+    QVERIFY(editor != nullptr);
+    QVERIFY(graphicsView != nullptr);
+
+    const auto startNode = editor->createNode("start", QPointF(80.0, 90.0));
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    editor->markCurrentStateClean();
+
+    auto *startGraphicsObject = selectNodeGraphicsObject(editor, startNode);
+    QVERIFY(startGraphicsObject != nullptr);
+    startGraphicsObject->setPos(QPointF(340.0, 260.0));
+
+    QMouseEvent releaseEvent(QEvent::MouseButtonRelease,
+                             QPoint(20, 20),
+                             graphicsView->viewport()->mapToGlobal(QPoint(20, 20)),
+                             Qt::LeftButton,
+                             Qt::NoButton,
+                             Qt::NoModifier);
+    QVERIFY(QCoreApplication::sendEvent(graphicsView->viewport(), &releaseEvent));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(editor->nodePosition(startNode), QPointF(340.0, 260.0));
+    QVERIFY(editor->canUndo());
+    QVERIFY(!editor->isClean());
+
+    editor->undo();
+    QCOMPARE(editor->nodePosition(startNode), QPointF(80.0, 90.0));
+    QVERIFY(editor->isClean());
+
+    editor->redo();
+    QCOMPARE(editor->nodePosition(startNode), QPointF(340.0, 260.0));
+}
+
 void MainWindowTests::fitWorkflowActionShowsEntireLargeWorkflow()
 {
     LanguageManager languageManager;
@@ -696,6 +783,87 @@ void MainWindowTests::fitWorkflowActionShowsEntireLargeWorkflow()
     const QPointF afterCenter = editor->viewportSceneCenter();
     QVERIFY(afterCenter.x() > beforeCenter.x() + 400.0);
     QVERIFY(afterCenter.y() > beforeCenter.y() + 250.0);
+}
+
+void MainWindowTests::alignsSelectedNodesLeftWithUndoRedo()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start", QPointF(320.0, 40.0));
+    const auto promptNode = editor->createNode("prompt", QPointF(100.0, 180.0));
+    const auto outputNode = editor->createNode("output", QPointF(240.0, 320.0));
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    editor->markCurrentStateClean();
+    selectNodeGraphicsObject(editor, startNode);
+    selectNodeGraphicsObject(editor, promptNode, false);
+    selectNodeGraphicsObject(editor, outputNode, false);
+
+    editor->alignSelectedNodes(QtNodesEditorWidget::Alignment::Left);
+
+    QCOMPARE(editor->nodePosition(startNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(promptNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(outputNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(startNode).y(), 40.0);
+    QCOMPARE(editor->nodePosition(promptNode).y(), 180.0);
+    QCOMPARE(editor->nodePosition(outputNode).y(), 320.0);
+    QVERIFY(editor->canUndo());
+    QVERIFY(!editor->isClean());
+
+    editor->undo();
+    QCOMPARE(editor->nodePosition(startNode), QPointF(320.0, 40.0));
+    QCOMPARE(editor->nodePosition(promptNode), QPointF(100.0, 180.0));
+    QCOMPARE(editor->nodePosition(outputNode), QPointF(240.0, 320.0));
+    QVERIFY(editor->isClean());
+
+    editor->redo();
+    QCOMPARE(editor->nodePosition(startNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(promptNode).x(), 100.0);
+    QCOMPARE(editor->nodePosition(outputNode).x(), 100.0);
+}
+
+void MainWindowTests::distributesSelectedNodesHorizontallyWithUndoRedo()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto startNode = editor->createNode("start", QPointF(100.0, 40.0));
+    const auto promptNode = editor->createNode("prompt", QPointF(460.0, 180.0));
+    const auto outputNode = editor->createNode("output", QPointF(220.0, 320.0));
+    QVERIFY(startNode != QtNodes::InvalidNodeId);
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    editor->markCurrentStateClean();
+    selectNodeGraphicsObject(editor, startNode);
+    selectNodeGraphicsObject(editor, promptNode, false);
+    selectNodeGraphicsObject(editor, outputNode, false);
+
+    editor->distributeSelectedNodes(QtNodesEditorWidget::Distribution::Horizontal);
+
+    QCOMPARE(editor->nodePosition(startNode), QPointF(100.0, 40.0));
+    QCOMPARE(editor->nodePosition(outputNode), QPointF(280.0, 320.0));
+    QCOMPARE(editor->nodePosition(promptNode), QPointF(460.0, 180.0));
+    QVERIFY(editor->canUndo());
+    QVERIFY(!editor->isClean());
+
+    editor->undo();
+    QCOMPARE(editor->nodePosition(startNode), QPointF(100.0, 40.0));
+    QCOMPARE(editor->nodePosition(outputNode), QPointF(220.0, 320.0));
+    QCOMPARE(editor->nodePosition(promptNode), QPointF(460.0, 180.0));
+    QVERIFY(editor->isClean());
+
+    editor->redo();
+    QCOMPARE(editor->nodePosition(outputNode), QPointF(280.0, 320.0));
 }
 
 void MainWindowTests::defaultsWorkbenchTextToChinese()

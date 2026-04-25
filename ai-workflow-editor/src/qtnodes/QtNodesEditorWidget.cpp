@@ -180,6 +180,7 @@ bool QtNodesEditorWidget::eventFilter(QObject *watched, QEvent *event)
             if (_connectionFeedbackActive) {
                 QTimer::singleShot(0, this, [this]() { clearConnectionFeedback(); });
             }
+            commitMovedSelectedNodeGraphicsPositions();
             return false;
         default:
             break;
@@ -475,6 +476,118 @@ void QtNodesEditorWidget::fitWorkflow()
 {
     _view->zoomFitAll();
     Q_EMIT zoomLevelChanged(zoomPercent());
+}
+
+void QtNodesEditorWidget::alignSelectedNodes(Alignment alignment)
+{
+    const auto nodeIds = selectedNodeIds();
+    if (nodeIds.size() < 2)
+        return;
+
+    qreal target = 0.0;
+    bool targetInitialized = false;
+    for (auto const nodeId : nodeIds) {
+        const QPointF position = nodePosition(nodeId);
+        const QSize size = nodeSize(nodeId);
+        qreal candidate = 0.0;
+        switch (alignment) {
+        case Alignment::Left:
+            candidate = position.x();
+            target = targetInitialized ? std::min(target, candidate) : candidate;
+            break;
+        case Alignment::Right:
+            candidate = position.x() + size.width();
+            target = targetInitialized ? std::max(target, candidate) : candidate;
+            break;
+        case Alignment::Top:
+            candidate = position.y();
+            target = targetInitialized ? std::min(target, candidate) : candidate;
+            break;
+        case Alignment::Bottom:
+            candidate = position.y() + size.height();
+            target = targetInitialized ? std::max(target, candidate) : candidate;
+            break;
+        }
+        targetInitialized = true;
+    }
+
+    std::vector<NodePositionEditCommand::Change> changes;
+    for (auto const nodeId : nodeIds) {
+        const QPointF oldPosition = nodePosition(nodeId);
+        const QSize size = nodeSize(nodeId);
+        QPointF newPosition = oldPosition;
+        switch (alignment) {
+        case Alignment::Left:
+            newPosition.setX(target);
+            break;
+        case Alignment::Right:
+            newPosition.setX(target - size.width());
+            break;
+        case Alignment::Top:
+            newPosition.setY(target);
+            break;
+        case Alignment::Bottom:
+            newPosition.setY(target - size.height());
+            break;
+        }
+
+        if (newPosition != oldPosition)
+            changes.push_back(NodePositionEditCommand::Change{nodeId, oldPosition, newPosition});
+    }
+
+    auto *command = new NodePositionEditCommand(this, std::move(changes));
+    if (command->isObsolete()) {
+        delete command;
+        return;
+    }
+    _scene->undoStack().push(command);
+}
+
+void QtNodesEditorWidget::distributeSelectedNodes(Distribution distribution)
+{
+    const auto nodeIds = selectedNodeIds();
+    if (nodeIds.size() < 3)
+        return;
+
+    struct PositionedNode
+    {
+        QtNodes::NodeId nodeId;
+        QPointF position;
+    };
+
+    std::vector<PositionedNode> positionedNodes;
+    positionedNodes.reserve(nodeIds.size());
+    for (auto const nodeId : nodeIds)
+        positionedNodes.push_back(PositionedNode{nodeId, nodePosition(nodeId)});
+
+    const bool horizontal = distribution == Distribution::Horizontal;
+    std::sort(positionedNodes.begin(), positionedNodes.end(), [horizontal](PositionedNode const &a, PositionedNode const &b) {
+        return horizontal ? a.position.x() < b.position.x() : a.position.y() < b.position.y();
+    });
+
+    const qreal first = horizontal ? positionedNodes.front().position.x() : positionedNodes.front().position.y();
+    const qreal last = horizontal ? positionedNodes.back().position.x() : positionedNodes.back().position.y();
+    const qreal step = (last - first) / static_cast<qreal>(positionedNodes.size() - 1);
+
+    std::vector<NodePositionEditCommand::Change> changes;
+    for (int i = 1; i < static_cast<int>(positionedNodes.size()) - 1; ++i) {
+        const QPointF oldPosition = positionedNodes[i].position;
+        QPointF newPosition = oldPosition;
+        if (horizontal)
+            newPosition.setX(first + step * i);
+        else
+            newPosition.setY(first + step * i);
+
+        if (newPosition != oldPosition)
+            changes.push_back(NodePositionEditCommand::Change{positionedNodes[i].nodeId, oldPosition, newPosition});
+    }
+
+    auto *command = new NodePositionEditCommand(this, std::move(changes));
+    if (command->isObsolete()) {
+        delete command;
+        return;
+    }
+    _scene->undoStack().push(command);
 }
 
 void QtNodesEditorWidget::undo()
@@ -898,10 +1011,16 @@ void QtNodesEditorWidget::setSelectedNodeProperty(QString const &propertyKey, QV
 
 void QtNodesEditorWidget::setNodePosition(QtNodes::NodeId nodeId, QPointF const &scenePosition)
 {
+    setNodePositionInternal(nodeId, scenePosition);
+}
+
+void QtNodesEditorWidget::setNodePositionInternal(QtNodes::NodeId nodeId, QPointF const &scenePosition)
+{
     if (!_graphModel->nodeExists(nodeId))
         return;
 
     _graphModel->setNodeData(nodeId, QtNodes::NodeRole::Position, scenePosition);
+    scheduleMiniMapUpdate();
 }
 
 QJsonObject QtNodesEditorWidget::workflowToJson() const
@@ -1618,6 +1737,28 @@ void QtNodesEditorWidget::clearConnectionFeedback()
 
     _connectionFeedbackActive = false;
     Q_EMIT dropPreviewMessageChanged(tr("Ready"));
+}
+
+void QtNodesEditorWidget::commitMovedSelectedNodeGraphicsPositions()
+{
+    std::vector<NodePositionEditCommand::Change> changes;
+    for (auto const nodeId : selectedNodeIds()) {
+        auto *nodeGraphicsObject = _scene->nodeGraphicsObject(nodeId);
+        if (nodeGraphicsObject == nullptr)
+            continue;
+
+        const QPointF oldPosition = nodePosition(nodeId);
+        const QPointF newPosition = nodeGraphicsObject->pos();
+        if (oldPosition != newPosition)
+            changes.push_back(NodePositionEditCommand::Change{nodeId, oldPosition, newPosition});
+    }
+
+    auto *command = new NodePositionEditCommand(this, std::move(changes));
+    if (command->isObsolete()) {
+        delete command;
+        return;
+    }
+    _scene->undoStack().push(command);
 }
 
 void QtNodesEditorWidget::retranslateBuiltInContent()

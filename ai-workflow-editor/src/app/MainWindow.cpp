@@ -59,6 +59,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _settingsMenu(nullptr)
     , _languageMenu(nullptr)
     , _recentFilesMenu(nullptr)
+    , _arrangeMenu(nullptr)
     , _primaryToolBar(nullptr)
     , _nodeLibraryDock(nullptr)
     , _inspectorDock(nullptr)
@@ -88,6 +89,12 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _redoAction(nullptr)
     , _centerAction(nullptr)
     , _fitWorkflowAction(nullptr)
+    , _alignLeftAction(nullptr)
+    , _alignRightAction(nullptr)
+    , _alignTopAction(nullptr)
+    , _alignBottomAction(nullptr)
+    , _distributeHorizontalAction(nullptr)
+    , _distributeVerticalAction(nullptr)
     , _toggleNodeLibraryAction(nullptr)
     , _toggleInspectorAction(nullptr)
     , _languageMenuAction(nullptr)
@@ -109,6 +116,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _editMenu->setObjectName("editMenu");
     _viewMenu = menuBar()->addMenu(QString());
     _viewMenu->setObjectName("viewMenu");
+    _arrangeMenu = new QMenu(this);
+    _arrangeMenu->setObjectName("arrangeMenu");
     _settingsMenu = menuBar()->addMenu(QString());
     _settingsMenu->setObjectName("settingsMenu");
     _languageMenu = _settingsMenu->addMenu(QString());
@@ -167,6 +176,18 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _centerAction->setObjectName("centerAction");
     _fitWorkflowAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("fit-workflow")), QString());
     _fitWorkflowAction->setObjectName("fitWorkflowAction");
+    _alignLeftAction = new QAction(this);
+    _alignLeftAction->setObjectName("alignLeftAction");
+    _alignRightAction = new QAction(this);
+    _alignRightAction->setObjectName("alignRightAction");
+    _alignTopAction = new QAction(this);
+    _alignTopAction->setObjectName("alignTopAction");
+    _alignBottomAction = new QAction(this);
+    _alignBottomAction->setObjectName("alignBottomAction");
+    _distributeHorizontalAction = new QAction(this);
+    _distributeHorizontalAction->setObjectName("distributeHorizontalAction");
+    _distributeVerticalAction = new QAction(this);
+    _distributeVerticalAction->setObjectName("distributeVerticalAction");
     _primaryToolBar->addSeparator();
 
     _toggleNodeLibraryAction = new QAction(this);
@@ -380,6 +401,24 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_redoAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::redo);
     connect(_centerAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::centerSelection);
     connect(_fitWorkflowAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::fitWorkflow);
+    connect(_alignLeftAction, &QAction::triggered, _editorWidget, [this]() {
+        _editorWidget->alignSelectedNodes(QtNodesEditorWidget::Alignment::Left);
+    });
+    connect(_alignRightAction, &QAction::triggered, _editorWidget, [this]() {
+        _editorWidget->alignSelectedNodes(QtNodesEditorWidget::Alignment::Right);
+    });
+    connect(_alignTopAction, &QAction::triggered, _editorWidget, [this]() {
+        _editorWidget->alignSelectedNodes(QtNodesEditorWidget::Alignment::Top);
+    });
+    connect(_alignBottomAction, &QAction::triggered, _editorWidget, [this]() {
+        _editorWidget->alignSelectedNodes(QtNodesEditorWidget::Alignment::Bottom);
+    });
+    connect(_distributeHorizontalAction, &QAction::triggered, _editorWidget, [this]() {
+        _editorWidget->distributeSelectedNodes(QtNodesEditorWidget::Distribution::Horizontal);
+    });
+    connect(_distributeVerticalAction, &QAction::triggered, _editorWidget, [this]() {
+        _editorWidget->distributeSelectedNodes(QtNodesEditorWidget::Distribution::Vertical);
+    });
 
     connect(_languageChineseAction, &QAction::triggered, this, [this]() {
         if (_languageManager != nullptr)
@@ -476,6 +515,16 @@ void MainWindow::updateWorkbenchActionStates()
     _selectAllAction->setEnabled(_editorWidget->hasNodes());
     _centerAction->setEnabled(_editorWidget->hasNodes());
     _fitWorkflowAction->setEnabled(_editorWidget->hasNodes());
+    const int selectedNodeCount = static_cast<int>(_editorWidget->selectedNodeIds().size());
+    const bool canAlign = selectedNodeCount >= 2;
+    const bool canDistribute = selectedNodeCount >= 3;
+    _arrangeMenu->setEnabled(canAlign || canDistribute);
+    _alignLeftAction->setEnabled(canAlign);
+    _alignRightAction->setEnabled(canAlign);
+    _alignTopAction->setEnabled(canAlign);
+    _alignBottomAction->setEnabled(canAlign);
+    _distributeHorizontalAction->setEnabled(canDistribute);
+    _distributeVerticalAction->setEnabled(canDistribute);
     const bool hasNodes = _editorWidget->hasNodes();
     _exportMenu->setEnabled(hasNodes);
     _exportLangChainAction->setEnabled(hasNodes);
@@ -569,6 +618,13 @@ void MainWindow::retranslateUi()
     _redoAction->setText(tr("Redo"));
     _centerAction->setText(tr("Center"));
     _fitWorkflowAction->setText(tr("Fit Workflow"));
+    _arrangeMenu->setTitle(tr("Arrange"));
+    _alignLeftAction->setText(tr("Align Left"));
+    _alignRightAction->setText(tr("Align Right"));
+    _alignTopAction->setText(tr("Align Top"));
+    _alignBottomAction->setText(tr("Align Bottom"));
+    _distributeHorizontalAction->setText(tr("Distribute Horizontally"));
+    _distributeVerticalAction->setText(tr("Distribute Vertically"));
     _undoAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Undo).constFirst());
     _redoAction->setShortcut(QKeySequence::keyBindings(QKeySequence::Redo).constFirst());
     _centerAction->setShortcut(QKeySequence(Qt::Key_Space));
@@ -620,6 +676,16 @@ void MainWindow::retranslateUi()
     _viewMenu->clear();
     _viewMenu->addAction(_centerAction);
     _viewMenu->addAction(_fitWorkflowAction);
+    _viewMenu->addSeparator();
+    _arrangeMenu->clear();
+    _arrangeMenu->addAction(_alignLeftAction);
+    _arrangeMenu->addAction(_alignRightAction);
+    _arrangeMenu->addAction(_alignTopAction);
+    _arrangeMenu->addAction(_alignBottomAction);
+    _arrangeMenu->addSeparator();
+    _arrangeMenu->addAction(_distributeHorizontalAction);
+    _arrangeMenu->addAction(_distributeVerticalAction);
+    _viewMenu->addMenu(_arrangeMenu);
     _viewMenu->addSeparator();
     _viewMenu->addAction(_toggleNodeLibraryAction);
     _viewMenu->addAction(_toggleInspectorAction);

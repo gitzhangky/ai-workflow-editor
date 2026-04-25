@@ -155,6 +155,13 @@
     <message><source>Redo</source><translation>重做</translation></message>
     <message><source>Center</source><translation>居中</translation></message>
     <message><source>Fit Workflow</source><translation>适配全图</translation></message>
+    <message><source>Arrange</source><translation>整理</translation></message>
+    <message><source>Align Left</source><translation>左对齐</translation></message>
+    <message><source>Align Right</source><translation>右对齐</translation></message>
+    <message><source>Align Top</source><translation>顶部对齐</translation></message>
+    <message><source>Align Bottom</source><translation>底部对齐</translation></message>
+    <message><source>Distribute Horizontally</source><translation>水平分布</translation></message>
+    <message><source>Distribute Vertically</source><translation>垂直分布</translation></message>
     <message><source>Language</source><translation>语言</translation></message>
     <message><source>Show Node Library</source><translation>显示节点库</translation></message>
     <message><source>Show Inspector</source><translation>显示属性面板</translation></message>

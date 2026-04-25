@@ -355,6 +355,15 @@ QString HelpDocumentWidget::buildHelpContent() const
             "<li>Help opens in a reusable central tab and does not consume the node library or Inspector area.</li>"
             "</ul>");
 
+        html += QStringLiteral("<h2>Arranging Larger Workflows</h2>");
+        html += QStringLiteral(
+            "<p>When the canvas gets crowded, select multiple nodes and use <b>View &gt; Arrange</b>.</p>"
+            "<ul>"
+            "<li><b>Align Left / Right / Top / Bottom</b> straightens two or more selected nodes.</li>"
+            "<li><b>Distribute Horizontally / Vertically</b> spaces three or more selected nodes evenly.</li>"
+            "<li>Manual node moves and arrange operations participate in undo / redo and are saved with the workflow.</li>"
+            "</ul>");
+
         html += QStringLiteral("<h2>Keyboard Shortcuts</h2>");
         html += QStringLiteral(
             "<table><tr><th>Shortcut</th><th>Action</th></tr>"
@@ -443,6 +452,15 @@ QString HelpDocumentWidget::buildHelpContent() const
         "<li><b>适配全图</b> 总是把完整工作流拉回视野。</li>"
         "<li><b>画布小地图</b> 会在有节点时出现，点击或拖拽小地图可以快速导航大画布。</li>"
         "<li>帮助文档会在中央工作区复用页签，不占用节点库和 Inspector 的空间。</li>"
+        "</ul>");
+
+    html += QStringLiteral("<h2>整理大型工作流</h2>");
+    html += QStringLiteral(
+        "<p>当画布节点变多时，先多选节点，再使用 <b>视图 &gt; 整理</b>。</p>"
+        "<ul>"
+        "<li><b>左对齐 / 右对齐 / 顶部对齐 / 底部对齐</b> 可以排齐 2 个及以上节点。</li>"
+        "<li><b>水平分布 / 垂直分布</b> 可以把 3 个及以上节点均匀排开。</li>"
+        "<li>手动拖动节点和整理操作都会进入撤销 / 重做，并随工作流一起保存。</li>"
         "</ul>");
 
     html += QStringLiteral("<h2>快捷键</h2>");

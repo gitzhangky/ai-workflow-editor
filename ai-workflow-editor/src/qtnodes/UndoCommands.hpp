@@ -112,3 +112,22 @@ private:
     QVariant _oldValue;
     QVariant _newValue;
 };
+
+class NodePositionEditCommand : public QUndoCommand
+{
+public:
+    struct Change
+    {
+        QtNodes::NodeId nodeId;
+        QPointF oldPosition;
+        QPointF newPosition;
+    };
+
+    NodePositionEditCommand(QtNodesEditorWidget *editor, std::vector<Change> changes);
+    void undo() override;
+    void redo() override;
+
+private:
+    QtNodesEditorWidget *_editor;
+    std::vector<Change> _changes;
+};

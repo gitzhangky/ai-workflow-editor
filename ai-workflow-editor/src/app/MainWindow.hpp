@@ -63,6 +63,7 @@ private:
     QMenu *_settingsMenu;
     QMenu *_languageMenu;
     QMenu *_recentFilesMenu;
+    QMenu *_arrangeMenu;
     QToolBar *_primaryToolBar;
     QDockWidget *_nodeLibraryDock;
     QDockWidget *_inspectorDock;
@@ -94,6 +95,12 @@ private:
     QAction *_redoAction;
     QAction *_centerAction;
     QAction *_fitWorkflowAction;
+    QAction *_alignLeftAction;
+    QAction *_alignRightAction;
+    QAction *_alignTopAction;
+    QAction *_alignBottomAction;
+    QAction *_distributeHorizontalAction;
+    QAction *_distributeVerticalAction;
     QAction *_toggleNodeLibraryAction;
     QAction *_toggleInspectorAction;
     QAction *_languageMenuAction;

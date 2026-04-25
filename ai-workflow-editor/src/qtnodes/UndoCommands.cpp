@@ -256,3 +256,35 @@ void NodePropertyEditCommand::redo()
     if (_editor != nullptr)
         _editor->setNodePropertyInternal(_nodeId, _propertyKey, _newValue);
 }
+
+// --- NodePositionEditCommand ---
+
+NodePositionEditCommand::NodePositionEditCommand(QtNodesEditorWidget *editor, std::vector<Change> changes)
+    : _editor(editor)
+    , _changes(std::move(changes))
+{
+    if (_changes.empty())
+        setObsolete(true);
+}
+
+void NodePositionEditCommand::undo()
+{
+    if (_editor == nullptr)
+        return;
+
+    for (auto const &change : _changes)
+        _editor->setNodePositionInternal(change.nodeId, change.oldPosition);
+
+    Q_EMIT _editor->workflowModified();
+}
+
+void NodePositionEditCommand::redo()
+{
+    if (_editor == nullptr)
+        return;
+
+    for (auto const &change : _changes)
+        _editor->setNodePositionInternal(change.nodeId, change.newPosition);
+
+    Q_EMIT _editor->workflowModified();
+}

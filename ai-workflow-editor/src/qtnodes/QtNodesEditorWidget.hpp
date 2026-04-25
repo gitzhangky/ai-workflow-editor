@@ -35,8 +35,23 @@ class QtNodesEditorWidget : public QWidget
     friend class NodeDisplayNameEditCommand;
     friend class NodeDescriptionEditCommand;
     friend class NodePropertyEditCommand;
+    friend class NodePositionEditCommand;
 
 public:
+    enum class Alignment
+    {
+        Left,
+        Right,
+        Top,
+        Bottom
+    };
+
+    enum class Distribution
+    {
+        Horizontal,
+        Vertical
+    };
+
     explicit QtNodesEditorWidget(QWidget *parent = nullptr);
     ~QtNodesEditorWidget() override;
 
@@ -53,6 +68,8 @@ public:
     void selectAllNodes();
     void centerSelection();
     void fitWorkflow();
+    void alignSelectedNodes(Alignment alignment);
+    void distributeSelectedNodes(Distribution distribution);
     void copySelection();
     void pasteClipboard();
     void duplicateSelection();
@@ -159,6 +176,7 @@ private:
     void setNodeDisplayNameInternal(QtNodes::NodeId nodeId, QString const &displayName);
     void setNodeDescriptionInternal(QtNodes::NodeId nodeId, QString const &description);
     void setNodePropertyInternal(QtNodes::NodeId nodeId, QString const &propertyKey, QVariant const &value);
+    void setNodePositionInternal(QtNodes::NodeId nodeId, QPointF const &scenePosition);
     NodeSnapshot snapshotNode(QtNodes::NodeId nodeId) const;
     void refreshSelectedNodeState();
     void applyNodeStyle(QtNodes::NodeId nodeId, QString const &typeKey);
@@ -176,6 +194,7 @@ private:
     void clearDropPreview();
     void updateConnectionFeedback(QPoint const &viewportPoint);
     void clearConnectionFeedback();
+    void commitMovedSelectedNodeGraphicsPositions();
     void onConnectionCreated(QtNodes::ConnectionId const connectionId);
     void onConnectionDeleted(QtNodes::ConnectionId const connectionId);
     void handleNodeSelected(QtNodes::NodeId nodeId);
