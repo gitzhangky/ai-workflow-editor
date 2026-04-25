@@ -33,6 +33,21 @@ unsigned int StaticNodeDelegateModel::nPorts(QtNodes::PortType portType) const
     return static_cast<unsigned int>(_definition.outputPorts.size());
 }
 
+QString StaticNodeDelegateModel::portCaption(QtNodes::PortType portType, QtNodes::PortIndex portIndex) const
+{
+    auto const &ports = (portType == QtNodes::PortType::In) ? _definition.inputPorts
+                                                            : _definition.outputPorts;
+    const int idx = static_cast<int>(portIndex);
+    if (idx >= 0 && idx < ports.size())
+        return ports[idx].label;
+    return {};
+}
+
+bool StaticNodeDelegateModel::portCaptionVisible(QtNodes::PortType, QtNodes::PortIndex) const
+{
+    return true;
+}
+
 QtNodes::NodeDataType StaticNodeDelegateModel::dataType(QtNodes::PortType portType, QtNodes::PortIndex portIndex) const
 {
     auto const &ports = (portType == QtNodes::PortType::In) ? _definition.inputPorts

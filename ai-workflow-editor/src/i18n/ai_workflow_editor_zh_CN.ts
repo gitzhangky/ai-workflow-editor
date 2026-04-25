@@ -218,6 +218,8 @@
     <message><source>The current workflow has unsaved changes.
 Do you want to save before continuing?</source><translation>当前工作流有未保存的更改。
 是否在继续前保存？</translation></message>
+    <message><source>Discard</source><translation>丢弃</translation></message>
+    <message><source>Cancel</source><translation>取消</translation></message>
   </context>
   <context>
     <name>QtNodesEditorWidget</name>

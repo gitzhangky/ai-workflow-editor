@@ -31,11 +31,13 @@ QWidget *createSectionWidget(QWidget *parent, QVBoxLayout *rootLayout)
 void setWidgetValue(QWidget *widget, QVariant const &value)
 {
     if (auto *lineEdit = qobject_cast<QLineEdit *>(widget); lineEdit != nullptr) {
-        lineEdit->setText(value.toString());
+        if (lineEdit->text() != value.toString())
+            lineEdit->setText(value.toString());
         return;
     }
     if (auto *textEdit = qobject_cast<QTextEdit *>(widget); textEdit != nullptr) {
-        textEdit->setPlainText(value.toString());
+        if (textEdit->toPlainText() != value.toString())
+            textEdit->setPlainText(value.toString());
         return;
     }
     if (auto *doubleSpinBox = qobject_cast<QDoubleSpinBox *>(widget); doubleSpinBox != nullptr) {
@@ -368,8 +370,10 @@ void InspectorPanel::setSelectedNode(QString const &typeKey,
 
     _displayNameEdit->setEnabled(true);
     _descriptionEdit->setEnabled(true);
-    _displayNameEdit->setText(displayName);
-    _descriptionEdit->setPlainText(description);
+    if (_displayNameEdit->text() != displayName)
+        _displayNameEdit->setText(displayName);
+    if (_descriptionEdit->toPlainText() != description)
+        _descriptionEdit->setPlainText(description);
 
     applyPropertyFieldValues(properties);
     clearPropertyFieldValidationState();

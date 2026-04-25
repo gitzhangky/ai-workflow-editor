@@ -30,39 +30,6 @@ QColor headerColorFor(QtNodes::NodeStyle const &style, bool selected)
     return selected ? style.SelectedBoundaryColor : style.NormalBoundaryColor;
 }
 
-QString badgeTextFor(QString const &typeKey)
-{
-    if (typeKey == QStringLiteral("start") || typeKey == QStringLiteral("condition")
-        || typeKey == QStringLiteral("chatOutput") || typeKey == QStringLiteral("output")) {
-        return QStringLiteral("FLOW");
-    }
-
-    if (typeKey == QStringLiteral("prompt") || typeKey == QStringLiteral("llm")
-        || typeKey == QStringLiteral("agent")) {
-        return QStringLiteral("AI");
-    }
-
-    if (typeKey == QStringLiteral("jsonTransform"))
-        return QStringLiteral("JSON");
-
-    if (typeKey == QStringLiteral("tool"))
-        return QStringLiteral("TOOL");
-
-    return typeKey.toUpper();
-}
-
-int hintLineCount(QString const &typeKey)
-{
-    if (typeKey == QStringLiteral("start") || typeKey == QStringLiteral("chatOutput")
-        || typeKey == QStringLiteral("output")) {
-        return 1;
-    }
-
-    if (typeKey == QStringLiteral("condition"))
-        return 2;
-
-    return 3;
-}
 
 QRectF cardRectFor(QtNodes::AbstractNodeGeometry const &geometry, QtNodes::NodeId nodeId)
 {
@@ -81,7 +48,6 @@ void StyledNodePainter::paint(QPainter *painter, QtNodes::NodeGraphicsObject &ng
 
     drawCard(painter, ngo);
     drawHeader(painter, ngo);
-    drawTitle(painter, ngo);
     drawValidationBadge(painter, ngo);
     drawPorts(painter, ngo);
 }
@@ -141,7 +107,7 @@ void StyledNodePainter::drawHeader(QPainter *painter, QtNodes::NodeGraphicsObjec
     auto const nodeStyle = styleFor(model, nodeId);
     auto const headerColor = headerColorFor(nodeStyle, ngo.isSelected());
 
-    QRectF headerRect(rect.left() + 1.0, rect.top() + 1.0, rect.width() - 2.0, 28.0);
+    QRectF headerRect(rect.left() + 1.0, rect.top() + 1.0, rect.width() - 2.0, 34.0);
     QPainterPath headerPath;
     headerPath.moveTo(headerRect.left() + CardCornerRadius, headerRect.top());
     headerPath.lineTo(headerRect.right() - CardCornerRadius, headerRect.top());
@@ -159,71 +125,20 @@ void StyledNodePainter::drawHeader(QPainter *painter, QtNodes::NodeGraphicsObjec
 
     painter->fillPath(headerPath, headerColor);
 
-    QFont badgeFont = painter->font();
-    badgeFont.setPointSizeF(9.0);
-    badgeFont.setBold(true);
-    painter->setFont(badgeFont);
-    painter->setPen(QColor(255, 255, 255, 220));
+    QFont headerFont = painter->font();
+    headerFont.setPointSizeF(12.5);
+    headerFont.setBold(true);
+    painter->setFont(headerFont);
+    painter->setPen(QColor(255, 255, 255, 240));
     painter->drawText(headerRect.adjusted(12.0, 0.0, -12.0, 0.0),
                       Qt::AlignVCenter | Qt::AlignLeft,
-                      badgeTextFor(model.nodeData(nodeId, QtNodes::NodeRole::Type).toString()));
-}
-
-void StyledNodePainter::drawTitle(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const
-{
-    auto const &model = ngo.graphModel();
-    auto const nodeId = ngo.nodeId();
-    auto const &geometry = ngo.nodeScene()->nodeGeometry();
-    auto const rect = cardRectFor(geometry, nodeId);
-    auto const nodeStyle = styleFor(model, nodeId);
-
-    QFont titleFont = painter->font();
-    titleFont.setPointSizeF(11.5);
-    titleFont.setBold(true);
-    painter->setFont(titleFont);
-    painter->setPen(nodeStyle.FontColor);
-
-    QRectF titleRect(rect.left() + 14.0, rect.top() + 42.0, rect.width() - 28.0, 22.0);
-    painter->drawText(titleRect,
-                      Qt::AlignLeft | Qt::AlignVCenter,
                       model.nodeData(nodeId, QtNodes::NodeRole::Caption).toString());
 }
 
 void StyledNodePainter::drawContentHints(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const
 {
-    auto const &model = ngo.graphModel();
-    auto const nodeId = ngo.nodeId();
-    auto const &geometry = ngo.nodeScene()->nodeGeometry();
-    auto const rect = cardRectFor(geometry, nodeId);
-    auto const nodeStyle = styleFor(model, nodeId);
-    auto const typeKey = model.nodeData(nodeId, QtNodes::NodeRole::Type).toString();
-
-    painter->setPen(Qt::NoPen);
-
-    QColor hintColor(nodeStyle.FontColorFaded.red(),
-                     nodeStyle.FontColorFaded.green(),
-                     nodeStyle.FontColorFaded.blue(),
-                     60);
-    QColor strongHintColor(nodeStyle.FontColorFaded.red(),
-                           nodeStyle.FontColorFaded.green(),
-                           nodeStyle.FontColorFaded.blue(),
-                           95);
-
-    const int lineCount = hintLineCount(typeKey);
-    const qreal contentTop = rect.top() + 74.0;
-    const qreal contentBottom = rect.bottom() - 12.0;
-    qreal currentTop = contentTop;
-    for (int index = 0; index < lineCount; ++index) {
-        const qreal lineHeight = index == 0 ? 6.0 : 5.0;
-        if (currentTop + lineHeight > contentBottom)
-            break;
-
-        const qreal width = index == 0 ? rect.width() - 34.0 : rect.width() - 54.0 - (index * 8.0);
-        const QRectF lineRect(rect.left() + 14.0, currentTop, width, lineHeight);
-        painter->setBrush(index == 0 ? strongHintColor : hintColor);
-        painter->drawRoundedRect(lineRect, 2.5, 2.5);
-        currentTop += 14.0;
-    }
+    Q_UNUSED(painter);
+    Q_UNUSED(ngo);
 }
 
 void StyledNodePainter::drawPorts(QPainter *painter, QtNodes::NodeGraphicsObject &ngo) const
@@ -232,6 +147,11 @@ void StyledNodePainter::drawPorts(QPainter *painter, QtNodes::NodeGraphicsObject
     auto const nodeId = ngo.nodeId();
     auto const &geometry = ngo.nodeScene()->nodeGeometry();
     auto const nodeStyle = styleFor(model, nodeId);
+    auto const rect = cardRectFor(geometry, nodeId);
+
+    QFont labelFont = painter->font();
+    labelFont.setPointSizeF(9.5);
+    labelFont.setWeight(QFont::Light);
 
     for (QtNodes::PortType portType : {QtNodes::PortType::Out, QtNodes::PortType::In}) {
         auto const count = model.nodeData(nodeId,
@@ -283,6 +203,22 @@ void StyledNodePainter::drawPorts(QPainter *painter, QtNodes::NodeGraphicsObject
                 painter->setBrush(nodeStyle.FilledConnectionPointColor);
                 painter->drawEllipse(position, 3.2, 3.2);
             }
+
+            const QString label = model.portData(nodeId, portType, index, QtNodes::PortRole::Caption).toString();
+            if (!label.isEmpty()) {
+                painter->setFont(labelFont);
+                painter->setPen(nodeStyle.FontColorFaded);
+                const qreal labelOffset = portRadius + 6.0;
+                if (portType == QtNodes::PortType::In) {
+                    QRectF labelRect(position.x() + labelOffset, position.y() - 8.0,
+                                     rect.width() * 0.5, 16.0);
+                    painter->drawText(labelRect, Qt::AlignLeft | Qt::AlignVCenter, label);
+                } else {
+                    QRectF labelRect(position.x() - labelOffset - rect.width() * 0.5, position.y() - 8.0,
+                                     rect.width() * 0.5, 16.0);
+                    painter->drawText(labelRect, Qt::AlignRight | Qt::AlignVCenter, label);
+                }
+            }
         }
     }
 
@@ -305,7 +241,7 @@ void StyledNodePainter::drawValidationBadge(QPainter *painter, QtNodes::NodeGrap
     auto const &geometry = ngo.nodeScene()->nodeGeometry();
     auto const rect = cardRectFor(geometry, nodeId);
 
-    QRectF badgeRect(rect.right() - 28.0, rect.top() + 8.0, 16.0, 16.0);
+    QRectF badgeRect(rect.right() - 28.0, rect.top() + 10.0, 16.0, 16.0);
     painter->setPen(Qt::NoPen);
     painter->setBrush(accent);
     painter->drawEllipse(badgeRect);

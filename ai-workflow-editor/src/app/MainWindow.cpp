@@ -28,6 +28,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QStatusBar>
@@ -1018,17 +1019,21 @@ bool MainWindow::maybeSave()
     if (!_dirty)
         return true;
 
-    const auto result = QMessageBox::warning(this,
-                                              tr("Unsaved Changes"),
-                                              tr("The current workflow has unsaved changes.\n"
-                                                 "Do you want to save before continuing?"),
-                                              QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-                                              QMessageBox::Save);
+    QMessageBox msgBox(this);
+    msgBox.setIcon(QMessageBox::Warning);
+    msgBox.setWindowTitle(tr("Unsaved Changes"));
+    msgBox.setText(tr("The current workflow has unsaved changes.\n"
+                      "Do you want to save before continuing?"));
+    QAbstractButton *saveBtn = msgBox.addButton(tr("Save"), QMessageBox::AcceptRole);
+    msgBox.addButton(tr("Discard"), QMessageBox::DestructiveRole);
+    QAbstractButton *cancelBtn = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    msgBox.setDefaultButton(qobject_cast<QPushButton *>(saveBtn));
+    msgBox.exec();
 
-    if (result == QMessageBox::Cancel)
+    if (msgBox.clickedButton() == cancelBtn)
         return false;
 
-    if (result == QMessageBox::Save) {
+    if (msgBox.clickedButton() == saveBtn) {
         QString filePath = _currentWorkflowPath;
         if (filePath.isEmpty()) {
             filePath = QFileDialog::getSaveFileName(this,
