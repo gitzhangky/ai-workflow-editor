@@ -222,6 +222,46 @@ private slots:
         QVERIFY(result.code.contains("result = start"));
     }
 
+    void langchainExportInvokesPromptLlmChainForWorkflowOutput()
+    {
+        QJsonArray nodes;
+        nodes.append(makeNode(0, "start", "Start"));
+
+        QJsonObject promptProps;
+        promptProps["userPromptTemplate"] = "Summarize: {input}";
+        nodes.append(makeNode(1, "prompt", "Prompt", promptProps));
+
+        QJsonObject llmProps;
+        llmProps["modelName"] = "gpt-4o";
+        nodes.append(makeNode(2, "llm", "LLM", llmProps));
+        nodes.append(makeNode(3, "output", "Output"));
+
+        QJsonArray connections;
+        connections.append(makeConnection(0, 0, 1, 0));
+        connections.append(makeConnection(1, 0, 2, 0));
+        connections.append(makeConnection(2, 0, 3, 0));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes, connections), WorkflowExporter::Format::PythonLangChain);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("def run_workflow(input_text=\"Hello\"):"));
+        QVERIFY(result.code.contains("result = prompt_chain.invoke({\"input\": input_text})"));
+        QVERIFY(!result.code.contains("result = llm\n"));
+    }
+
+    void langchainExportRejectsIncompleteAgentNode()
+    {
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "agent", "My Agent"));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonLangChain);
+        QVERIFY(!result.success);
+        QVERIFY(result.errorMessage.contains("My Agent"));
+        QVERIFY(result.errorMessage.contains("model"));
+        QVERIFY(result.errorMessage.contains("instructions"));
+    }
+
     void pythonScriptExportSucceeds()
     {
         QJsonArray nodes;
@@ -366,6 +406,23 @@ private slots:
         QVERIFY(result.code.contains("\"assistant\""));
     }
 
+    void langchainExportRendersChatOutputTemplate()
+    {
+        QJsonObject props;
+        props["messageRole"] = "assistant";
+        props["messageTemplate"] = "Answer: {{result}}";
+
+        QJsonArray nodes;
+        nodes.append(makeNode(1, "chatOutput", "Chat Output", props));
+
+        auto result = WorkflowExporter::exportWorkflow(
+            makeWorkflow(nodes), WorkflowExporter::Format::PythonLangChain);
+        QVERIFY(result.success);
+        QVERIFY(result.code.contains("message_template = \"Answer: {{result}}\""));
+        QVERIFY(result.code.contains("_render_message_template(message_template, content)"));
+        QVERIFY(result.code.contains("\"content\": rendered_content"));
+    }
+
     void langchainExportGeneratesJsonTransformNode()
     {
         QJsonObject props;
@@ -438,7 +495,7 @@ private slots:
         QVERIFY(result.code.contains("ChatPromptTemplate"));
         QVERIFY(result.code.contains("ChatOpenAI"));
         QVERIFY(result.code.contains("summarize_prompt_chain = summarize_prompt | gpt4o"));
-        QVERIFY(result.code.contains("result = gpt4o"));
+        QVERIFY(result.code.contains("result = summarize_prompt_chain.invoke({\"input\": input_text})"));
         QVERIFY(result.code.contains("if __name__"));
     }
 
