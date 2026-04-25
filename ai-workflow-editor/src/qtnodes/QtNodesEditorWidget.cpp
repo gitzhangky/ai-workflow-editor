@@ -1314,6 +1314,10 @@ void QtNodesEditorWidget::applyNodeStyle(QtNodes::NodeId nodeId, QString const &
     if (auto *nodeGraphicsObject = _scene->nodeGraphicsObject(nodeId); nodeGraphicsObject != nullptr) {
         if (nodeGraphicsObject->graphicsEffect() != nullptr)
             nodeGraphicsObject->setGraphicsEffect(nullptr);
+        nodeGraphicsObject->update();
+        _scene->update(nodeGraphicsObject->sceneBoundingRect());
+        if (_view != nullptr)
+            _view->viewport()->update();
     }
     Q_EMIT model->requestNodeUpdate();
 }
@@ -1793,11 +1797,15 @@ QSize QtNodesEditorWidget::computePreviewNodeSize(QString const &typeKey) const
 void QtNodesEditorWidget::onConnectionCreated(QtNodes::ConnectionId const connectionId)
 {
     refreshValidationForConnectionEndpoints(connectionId);
+    QTimer::singleShot(0, this, [this, connectionId]() { refreshValidationForConnectionEndpoints(connectionId); });
+    Q_EMIT workflowModified();
 }
 
 void QtNodesEditorWidget::onConnectionDeleted(QtNodes::ConnectionId const connectionId)
 {
     refreshValidationForConnectionEndpoints(connectionId);
+    QTimer::singleShot(0, this, [this, connectionId]() { refreshValidationForConnectionEndpoints(connectionId); });
+    Q_EMIT workflowModified();
 }
 
 void QtNodesEditorWidget::handleNodeSelected(QtNodes::NodeId nodeId)

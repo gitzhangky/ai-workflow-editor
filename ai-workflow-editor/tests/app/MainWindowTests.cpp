@@ -83,6 +83,7 @@ void clearCanvasSelection(QtNodesEditorWidget *editor)
         scene->clearSelection();
     QCoreApplication::processEvents();
 }
+
 }
 
 class MainWindowTests : public QObject
@@ -165,6 +166,7 @@ private slots:
     void highlightsInspectorFieldForInvalidToolJsonMapping();
     void keepsLlmAndToolValidationMessagesConsistentAcrossSurfaces();
     void refreshesFlowValidationAfterConnectionDeletionUndo();
+    void updatesFlowValidationSurfacesWhenConnectionFixesNode();
     void showsImmediateStatusFeedbackForInvalidConnectionDrag();
     void showsValidationSummaryForCurrentSelectionInStatusBar();
     void assignsExpectedKeyboardShortcuts();
@@ -2466,6 +2468,37 @@ void MainWindowTests::marksFlowNodesWithStructuralWarningsBasedOnConnections()
     QVERIFY(editor->connectNodes(conditionNode, 1, falseOutputNode, 0));
     QCOMPARE(editor->nodeValidationState(conditionNode), QString("valid"));
     QCOMPARE(editor->nodeValidationState(falseOutputNode), QString("valid"));
+}
+
+void MainWindowTests::updatesFlowValidationSurfacesWhenConnectionFixesNode()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsTable != nullptr);
+
+    const auto startNode = editor->createNode("start", QPointF(120.0, 120.0));
+    const auto conditionNode = editor->createNode("condition", QPointF(420.0, 120.0));
+    editor->selectNode(startNode);
+    editor->centerSelection();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(editor->nodeValidationState(startNode), QString("warning"));
+    const int problemCountBefore = problemsTable->rowCount();
+    QVERIFY(problemCountBefore >= 2);
+
+    QVERIFY(editor->connectNodes(startNode, 0, conditionNode, 0));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(editor->connectionCount(), 1);
+    QCOMPARE(editor->nodeValidationState(startNode), QString("valid"));
+    QVERIFY(problemsTable->rowCount() < problemCountBefore);
 }
 
 void MainWindowTests::showsValidationMessageInInspectorForSelectedNode()
