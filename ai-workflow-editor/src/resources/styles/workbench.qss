@@ -315,6 +315,29 @@ QLabel#zoomIndicatorLabel {
     padding: 2px 8px;
 }
 
+QTableWidget#problemsTable {
+    background: #fffaf2;
+    border: none;
+    color: #4f453c;
+    gridline-color: #e4d9c8;
+    selection-background-color: #e8eef7;
+    selection-color: #34445f;
+}
+
+QTableWidget#problemsTable::item {
+    padding: 5px 8px;
+}
+
+QHeaderView::section {
+    background: #eee5d8;
+    border: none;
+    border-right: 1px solid #ddd1bf;
+    border-bottom: 1px solid #ddd1bf;
+    color: #6a5d50;
+    font-weight: 700;
+    padding: 5px 8px;
+}
+
 QLabel#noSearchResultsLabel {
     color: #8a7d70;
     padding: 20px 12px;

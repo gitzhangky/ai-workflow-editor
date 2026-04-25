@@ -165,8 +165,14 @@
     <message><source>Language</source><translation>语言</translation></message>
     <message><source>Show Node Library</source><translation>显示节点库</translation></message>
     <message><source>Show Inspector</source><translation>显示属性面板</translation></message>
+    <message><source>Show Problems</source><translation>显示问题面板</translation></message>
     <message><source>Node Library</source><translation>节点库</translation></message>
     <message><source>Inspector</source><translation>属性面板</translation></message>
+    <message><source>Problems</source><translation>问题</translation></message>
+    <message><source>Level</source><translation>级别</translation></message>
+    <message><source>Node</source><translation>节点</translation></message>
+    <message><source>Type</source><translation>类型</translation></message>
+    <message><source>Problem</source><translation>问题</translation></message>
     <message><source>Search Nodes</source><translation>搜索节点</translation></message>
     <message><source>Ready</source><translation>就绪</translation></message>
     <message><source>New workflow</source><translation>已创建新工作流</translation></message>

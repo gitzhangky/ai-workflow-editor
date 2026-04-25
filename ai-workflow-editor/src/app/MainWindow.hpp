@@ -15,6 +15,7 @@ class QEvent;
 class QLabel;
 class QLineEdit;
 class QMenu;
+class QTableWidget;
 class QToolBar;
 class QToolButton;
 class QWidget;
@@ -48,6 +49,8 @@ private:
     void clearDirty();
     void updateWindowTitle();
     void updateWorkbenchActionStates();
+    void updateProblemsPanel();
+    void activateProblemRow(int row);
     void updateSelectionValidationSummary(QString const &state, QString const &message);
     bool maybeSave();
     void addToRecentFiles(QString const &filePath);
@@ -67,6 +70,7 @@ private:
     QToolBar *_primaryToolBar;
     QDockWidget *_nodeLibraryDock;
     QDockWidget *_inspectorDock;
+    QDockWidget *_problemsDock;
     QWidget *_nodeLibraryPanel;
     NodeLibraryListWidget *_nodeLibraryList;
     QLineEdit *_nodeLibrarySearchEdit;
@@ -77,6 +81,7 @@ private:
     HelpDocumentWidget *_helpWidget;
     QLabel *_selectionValidationSummaryLabel;
     QLabel *_zoomIndicatorLabel;
+    QTableWidget *_problemsTable;
     QAction *_newAction;
     QAction *_openAction;
     QAction *_saveAction;
@@ -103,6 +108,7 @@ private:
     QAction *_distributeVerticalAction;
     QAction *_toggleNodeLibraryAction;
     QAction *_toggleInspectorAction;
+    QAction *_toggleProblemsAction;
     QAction *_languageMenuAction;
     QAction *_languageChineseAction;
     QAction *_languageEnglishAction;

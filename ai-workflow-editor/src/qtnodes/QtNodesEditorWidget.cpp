@@ -763,6 +763,31 @@ QString QtNodesEditorWidget::nodeValidationMessage(QtNodes::NodeId nodeId) const
         ._stateMessage;
 }
 
+QList<QtNodesEditorWidget::ValidationIssue> QtNodesEditorWidget::validationIssues() const
+{
+    QList<ValidationIssue> issues;
+    for (auto const nodeId : sortedNodeIds()) {
+        auto const stateIt = _nodeStates.constFind(nodeId);
+        if (stateIt == _nodeStates.cend() || !_graphModel->nodeExists(nodeId))
+            continue;
+
+        const ValidationResult result = validationResultFor(nodeId, stateIt->typeKey, stateIt->properties);
+        if (result.state == QtNodes::NodeValidationState::State::Valid)
+            continue;
+
+        const QString state = result.state == QtNodes::NodeValidationState::State::Error
+                                  ? QStringLiteral("error")
+                                  : QStringLiteral("warning");
+        issues.append(ValidationIssue{nodeId,
+                                      stateIt->typeKey,
+                                      stateIt->displayName,
+                                      state,
+                                      result.message,
+                                      result.propertyKey});
+    }
+    return issues;
+}
+
 QString QtNodesEditorWidget::selectedNodeDisplayName() const
 {
     auto state = selectedState();

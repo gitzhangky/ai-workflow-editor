@@ -52,6 +52,16 @@ public:
         Vertical
     };
 
+    struct ValidationIssue
+    {
+        QtNodes::NodeId nodeId = QtNodes::InvalidNodeId;
+        QString typeKey;
+        QString displayName;
+        QString state;
+        QString message;
+        QString propertyKey;
+    };
+
     explicit QtNodesEditorWidget(QWidget *parent = nullptr);
     ~QtNodesEditorWidget() override;
 
@@ -97,6 +107,7 @@ public:
     QVariantMap nodeStyle(QtNodes::NodeId nodeId) const;
     QString nodeValidationState(QtNodes::NodeId nodeId) const;
     QString nodeValidationMessage(QtNodes::NodeId nodeId) const;
+    QList<ValidationIssue> validationIssues() const;
     QString selectedNodeDisplayName() const;
     QString selectedNodeDescription() const;
     QVariant selectedNodeProperty(QString const &propertyKey) const;

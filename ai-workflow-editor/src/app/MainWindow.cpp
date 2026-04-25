@@ -8,6 +8,7 @@
 #include "registry/BuiltInNodeRegistry.hpp"
 
 #include <QAction>
+#include <QAbstractItemView>
 #include <QCloseEvent>
 #include <QColor>
 #include <QCoreApplication>
@@ -16,6 +17,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
+#include <QHeaderView>
 #include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
@@ -27,6 +29,7 @@
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTabBar>
+#include <QTableWidget>
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -63,6 +66,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _primaryToolBar(nullptr)
     , _nodeLibraryDock(nullptr)
     , _inspectorDock(nullptr)
+    , _problemsDock(nullptr)
     , _nodeLibraryPanel(nullptr)
     , _nodeLibraryList(nullptr)
     , _nodeLibrarySearchEdit(nullptr)
@@ -71,6 +75,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _editorWidget(nullptr)
     , _helpWidget(nullptr)
     , _selectionValidationSummaryLabel(nullptr)
+    , _problemsTable(nullptr)
     , _newAction(nullptr)
     , _openAction(nullptr)
     , _saveAction(nullptr)
@@ -97,6 +102,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _distributeVerticalAction(nullptr)
     , _toggleNodeLibraryAction(nullptr)
     , _toggleInspectorAction(nullptr)
+    , _toggleProblemsAction(nullptr)
     , _languageMenuAction(nullptr)
     , _languageChineseAction(nullptr)
     , _languageEnglishAction(nullptr)
@@ -196,6 +202,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _toggleInspectorAction = new QAction(this);
     _toggleInspectorAction->setObjectName("toggleInspectorAction");
     _toggleInspectorAction->setCheckable(true);
+    _toggleProblemsAction = new QAction(this);
+    _toggleProblemsAction->setObjectName("toggleProblemsAction");
+    _toggleProblemsAction->setCheckable(true);
 
     _languageToolButton = new QToolButton(this);
     _languageToolButton->setObjectName("languageToolButton");
@@ -244,6 +253,23 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _inspectorDock->setWidget(_inspectorPanel);
     addDockWidget(Qt::RightDockWidgetArea, _inspectorDock);
     _toggleInspectorAction->setChecked(true);
+
+    _problemsDock = new QDockWidget(this);
+    _problemsDock->setObjectName("problemsDock");
+    _problemsTable = new QTableWidget(_problemsDock);
+    _problemsTable->setObjectName("problemsTable");
+    _problemsTable->setColumnCount(4);
+    _problemsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    _problemsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    _problemsTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    _problemsTable->verticalHeader()->hide();
+    _problemsTable->horizontalHeader()->setStretchLastSection(true);
+    _problemsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    _problemsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    _problemsTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    _problemsDock->setWidget(_problemsTable);
+    addDockWidget(Qt::BottomDockWidgetArea, _problemsDock);
+    _toggleProblemsAction->setChecked(true);
 
     _tabWidget = new WorkbenchTabWidget(this);
     _editorWidget = new QtNodesEditorWidget(_tabWidget);
@@ -325,6 +351,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
         _zoomIndicatorLabel->setText(QStringLiteral("%1%").arg(zoomPercent));
     });
     connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::markDirty);
+    connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::updateProblemsPanel);
     connect(_editorWidget, &QtNodesEditorWidget::cleanStateChanged, this, [this](bool clean) {
         if (clean)
             clearDirty();
@@ -343,6 +370,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
         _editorWidget->markCurrentStateClean();
         _currentWorkflowPath.clear();
         clearDirty();
+        updateProblemsPanel();
         statusBar()->showMessage(tr("New workflow"));
     });
 
@@ -431,8 +459,19 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
 
     connect(_toggleNodeLibraryAction, &QAction::toggled, _nodeLibraryDock, &QDockWidget::setVisible);
     connect(_toggleInspectorAction, &QAction::toggled, _inspectorDock, &QDockWidget::setVisible);
+    connect(_toggleProblemsAction, &QAction::toggled, _problemsDock, &QDockWidget::setVisible);
     connect(_nodeLibraryDock, &QDockWidget::visibilityChanged, _toggleNodeLibraryAction, &QAction::setChecked);
     connect(_inspectorDock, &QDockWidget::visibilityChanged, _toggleInspectorAction, &QAction::setChecked);
+    connect(_problemsDock, &QDockWidget::visibilityChanged, _toggleProblemsAction, &QAction::setChecked);
+    connect(_problemsTable, &QTableWidget::cellClicked, this, [this](int row, int) {
+        activateProblemRow(row);
+    });
+    connect(_problemsTable, &QTableWidget::cellActivated, this, [this](int row, int) {
+        activateProblemRow(row);
+    });
+    connect(_problemsTable, &QTableWidget::cellDoubleClicked, this, [this](int row, int) {
+        activateProblemRow(row);
+    });
     connect(_helpAction, &QAction::triggered, this, &MainWindow::openHelpTab);
 
     if (_languageManager != nullptr) {
@@ -450,6 +489,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
 
     retranslateUi();
     populateNodeLibrary();
+    updateProblemsPanel();
     updateLanguageActions();
     updateWorkbenchActionStates();
 }
@@ -495,6 +535,7 @@ bool MainWindow::loadWorkflowFromPath(QString const &filePath)
         _editorWidget->markCurrentStateClean();
         clearDirty();
         addToRecentFiles(filePath);
+        updateProblemsPanel();
         statusBar()->showMessage(tr("Loaded %1").arg(filePath));
     }
 
@@ -531,6 +572,49 @@ void MainWindow::updateWorkbenchActionStates()
     _exportPythonAction->setEnabled(hasNodes);
     _exportLangGraphAction->setEnabled(hasNodes);
     _exportCrewAIAction->setEnabled(hasNodes);
+}
+
+void MainWindow::updateProblemsPanel()
+{
+    if (_editorWidget == nullptr || _problemsTable == nullptr)
+        return;
+
+    const QSignalBlocker blocker(_problemsTable);
+    const auto issues = _editorWidget->validationIssues();
+    _problemsTable->setRowCount(issues.size());
+
+    for (int row = 0; row < issues.size(); ++row) {
+        auto const &issue = issues.at(row);
+        auto *levelItem = new QTableWidgetItem(issue.state);
+        levelItem->setData(Qt::UserRole, static_cast<int>(issue.nodeId));
+        levelItem->setData(Qt::UserRole + 1, issue.propertyKey);
+
+        auto *nodeItem = new QTableWidgetItem(issue.displayName);
+        auto *typeItem = new QTableWidgetItem(issue.typeKey);
+        auto *messageItem = new QTableWidgetItem(issue.message);
+
+        _problemsTable->setItem(row, 0, levelItem);
+        _problemsTable->setItem(row, 1, nodeItem);
+        _problemsTable->setItem(row, 2, typeItem);
+        _problemsTable->setItem(row, 3, messageItem);
+    }
+}
+
+void MainWindow::activateProblemRow(int row)
+{
+    if (_editorWidget == nullptr || _problemsTable == nullptr || row < 0 || row >= _problemsTable->rowCount())
+        return;
+
+    auto *item = _problemsTable->item(row, 0);
+    if (item == nullptr)
+        return;
+
+    const auto nodeId = static_cast<QtNodes::NodeId>(item->data(Qt::UserRole).toInt());
+    if (nodeId == QtNodes::InvalidNodeId)
+        return;
+
+    _editorWidget->selectNode(nodeId);
+    _editorWidget->centerSelection();
 }
 
 NodeLibraryListWidget *MainWindow::createNodeLibrary()
@@ -631,6 +715,7 @@ void MainWindow::retranslateUi()
     _fitWorkflowAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
     _toggleNodeLibraryAction->setText(tr("Show Node Library"));
     _toggleInspectorAction->setText(tr("Show Inspector"));
+    _toggleProblemsAction->setText(tr("Show Problems"));
     _languageToolButton->setToolTip(tr("Language"));
     _languageToolButton->setText(_languageManager != nullptr
                                      && _languageManager->currentLanguage() == LanguageManager::Language::English
@@ -638,6 +723,11 @@ void MainWindow::retranslateUi()
                                  : QStringLiteral("中文"));
     _nodeLibraryDock->setWindowTitle(tr("Node Library"));
     _inspectorDock->setWindowTitle(tr("Inspector"));
+    _problemsDock->setWindowTitle(tr("Problems"));
+    if (_problemsTable != nullptr) {
+        _problemsTable->setHorizontalHeaderLabels(
+            {tr("Level"), tr("Node"), tr("Type"), tr("Problem")});
+    }
     if (_nodeLibrarySearchEdit != nullptr)
         _nodeLibrarySearchEdit->setPlaceholderText(
             _languageManager != nullptr && _languageManager->currentLanguage() == LanguageManager::Language::English
@@ -689,6 +779,7 @@ void MainWindow::retranslateUi()
     _viewMenu->addSeparator();
     _viewMenu->addAction(_toggleNodeLibraryAction);
     _viewMenu->addAction(_toggleInspectorAction);
+    _viewMenu->addAction(_toggleProblemsAction);
 
     _settingsMenu->clear();
     _languageMenuAction = _settingsMenu->addMenu(_languageMenu);
@@ -712,6 +803,7 @@ void MainWindow::retranslateUi()
     populateNodeLibrary();
     updateLanguageActions();
     updateSelectionValidationSummary(QString(), QString());
+    updateProblemsPanel();
 }
 
 void MainWindow::updateLanguageActions()
@@ -898,9 +990,12 @@ void MainWindow::handleTabChanged(int index)
     const bool isCanvas = (index == 0);
     const QSignalBlocker inspectorBlocker(_inspectorDock);
     const QSignalBlocker nodeLibraryBlocker(_nodeLibraryDock);
+    const QSignalBlocker problemsBlocker(_problemsDock);
 
     _inspectorDock->setVisible(isCanvas && _toggleInspectorAction->isChecked());
     _nodeLibraryDock->setVisible(isCanvas && _toggleNodeLibraryAction->isChecked());
+    _problemsDock->setVisible(isCanvas && _toggleProblemsAction->isChecked());
     _toggleInspectorAction->setEnabled(isCanvas);
     _toggleNodeLibraryAction->setEnabled(isCanvas);
+    _toggleProblemsAction->setEnabled(isCanvas);
 }

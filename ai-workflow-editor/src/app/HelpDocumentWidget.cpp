@@ -355,6 +355,15 @@ QString HelpDocumentWidget::buildHelpContent() const
             "<li>Help opens in a reusable central tab and does not consume the node library or Inspector area.</li>"
             "</ul>");
 
+        html += QStringLiteral("<h2>Problems Panel</h2>");
+        html += QStringLiteral(
+            "<p>The bottom <b>Problems</b> panel lists every current workflow warning or error.</p>"
+            "<ul>"
+            "<li>Rows show severity, node name, node type, and the issue message.</li>"
+            "<li>Click a row to select that node, center the canvas, and highlight the relevant Inspector field.</li>"
+            "<li>Fixing a node immediately refreshes the list, so resolved problems disappear.</li>"
+            "</ul>");
+
         html += QStringLiteral("<h2>Arranging Larger Workflows</h2>");
         html += QStringLiteral(
             "<p>When the canvas gets crowded, select multiple nodes and use <b>View &gt; Arrange</b>.</p>"
@@ -452,6 +461,15 @@ QString HelpDocumentWidget::buildHelpContent() const
         "<li><b>适配全图</b> 总是把完整工作流拉回视野。</li>"
         "<li><b>画布小地图</b> 会在有节点时出现，点击或拖拽小地图可以快速导航大画布。</li>"
         "<li>帮助文档会在中央工作区复用页签，不占用节点库和 Inspector 的空间。</li>"
+        "</ul>");
+
+    html += QStringLiteral("<h2>问题面板</h2>");
+    html += QStringLiteral(
+        "<p>底部 <b>问题</b> 面板会汇总当前工作流中的所有 warning / error。</p>"
+        "<ul>"
+        "<li>每一行会显示级别、节点名称、节点类型和问题描述。</li>"
+        "<li>点击某一行会自动选中对应节点、居中画布，并高亮相关 Inspector 字段。</li>"
+        "<li>修复节点后列表会立即刷新，已经解决的问题会自动消失。</li>"
         "</ul>");
 
     html += QStringLiteral("<h2>整理大型工作流</h2>");

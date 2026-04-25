@@ -27,6 +27,7 @@
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTabWidget>
 #include <QTextEdit>
@@ -103,6 +104,9 @@ private slots:
     void exposesStableObjectNamesForWorkbenchChrome();
     void createsMenuBarWithFileViewAndSettingsMenus();
     void exposesCanvasArrangeActionsForMultiSelection();
+    void showsProblemsPanelWithWorkflowValidationIssues();
+    void activatingProblemSelectsNodeAndHighlightsInspectorField();
+    void problemsPanelRefreshesAfterIssueIsFixed();
     void keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty();
     void showsCanvasMiniMapWhenWorkflowHasNodes();
     void clickingCanvasMiniMapRecentersLargeCanvas();
@@ -141,6 +145,7 @@ private slots:
     void retranslatesInspectorFieldHintsAtRuntime();
     void showsTypeSpecificInspectorHeaderAndEmptyState();
     void appliesDistinctNodeCardStylesByType();
+    void exposesAllCurrentValidationIssues();
     void marksIncompletePromptNodeWithWarningValidationState();
     void marksIncompleteMemoryNodeWithWarningValidationState();
     void marksIncompleteRetrieverNodeWithWarningValidationState();
@@ -239,7 +244,10 @@ void MainWindowTests::createsNodeLibraryAndInspectorDocks()
     MainWindow window(&languageManager);
 
     const auto docks = window.findChildren<QDockWidget *>();
-    QCOMPARE(docks.size(), 2);
+    QCOMPARE(docks.size(), 3);
+    QVERIFY(window.findChild<QDockWidget *>("nodeLibraryDock") != nullptr);
+    QVERIFY(window.findChild<QDockWidget *>("inspectorDock") != nullptr);
+    QVERIFY(window.findChild<QDockWidget *>("problemsDock") != nullptr);
 
     auto *nodeLibrary = window.findChild<QListWidget *>("nodeLibraryList");
     QVERIFY(nodeLibrary != nullptr);
@@ -319,6 +327,8 @@ void MainWindowTests::userGuideCoversCoreWorkflowTasksWithVisualDiagrams()
     QVERIFY(plainText.contains(QString::fromUtf8("视图 > 整理")));
     QVERIFY(plainText.contains(QString::fromUtf8("左对齐 / 右对齐 / 顶部对齐 / 底部对齐")));
     QVERIFY(plainText.contains(QString::fromUtf8("水平分布 / 垂直分布")));
+    QVERIFY(plainText.contains(QString::fromUtf8("问题面板")));
+    QVERIFY(plainText.contains(QString::fromUtf8("自动选中对应节点、居中画布")));
     QVERIFY(plainText.contains(QString::fromUtf8("新功能必须同步更新帮助文档")));
 
     QVERIFY(plainText.contains(QString::fromUtf8("顶部工具栏和菜单")));
@@ -351,35 +361,45 @@ void MainWindowTests::preservesDockVisibilityPreferenceWhenSwitchingHelpTab()
     auto *helpAction = window.findChild<QAction *>("helpAction");
     auto *nodeLibraryDock = window.findChild<QDockWidget *>("nodeLibraryDock");
     auto *inspectorDock = window.findChild<QDockWidget *>("inspectorDock");
+    auto *problemsDock = window.findChild<QDockWidget *>("problemsDock");
     auto *toggleNodeLibraryAction = window.findChild<QAction *>("toggleNodeLibraryAction");
     auto *toggleInspectorAction = window.findChild<QAction *>("toggleInspectorAction");
+    auto *toggleProblemsAction = window.findChild<QAction *>("toggleProblemsAction");
     QVERIFY(tabs != nullptr);
     QVERIFY(helpAction != nullptr);
     QVERIFY(nodeLibraryDock != nullptr);
     QVERIFY(inspectorDock != nullptr);
+    QVERIFY(problemsDock != nullptr);
     QVERIFY(toggleNodeLibraryAction != nullptr);
     QVERIFY(toggleInspectorAction != nullptr);
+    QVERIFY(toggleProblemsAction != nullptr);
 
     QVERIFY(nodeLibraryDock->isVisible());
     QVERIFY(inspectorDock->isVisible());
+    QVERIFY(problemsDock->isVisible());
     QVERIFY(toggleNodeLibraryAction->isChecked());
     QVERIFY(toggleInspectorAction->isChecked());
+    QVERIFY(toggleProblemsAction->isChecked());
 
     helpAction->trigger();
     QCoreApplication::processEvents();
 
     QVERIFY(!nodeLibraryDock->isVisible());
     QVERIFY(!inspectorDock->isVisible());
+    QVERIFY(!problemsDock->isVisible());
     QVERIFY(toggleNodeLibraryAction->isChecked());
     QVERIFY(toggleInspectorAction->isChecked());
+    QVERIFY(toggleProblemsAction->isChecked());
 
     tabs->setCurrentIndex(0);
     QCoreApplication::processEvents();
 
     QVERIFY(nodeLibraryDock->isVisible());
     QVERIFY(inspectorDock->isVisible());
+    QVERIFY(problemsDock->isVisible());
     QVERIFY(toggleNodeLibraryAction->isChecked());
     QVERIFY(toggleInspectorAction->isChecked());
+    QVERIFY(toggleProblemsAction->isChecked());
 }
 
 void MainWindowTests::appliesLightWorkbenchCanvasBackground()
@@ -550,6 +570,104 @@ void MainWindowTests::exposesCanvasArrangeActionsForMultiSelection()
     QCOMPARE(editor->nodePosition(startNode).x(), 100.0);
     QCOMPARE(editor->nodePosition(promptNode).x(), 100.0);
     QCOMPARE(editor->nodePosition(outputNode).x(), 100.0);
+}
+
+void MainWindowTests::showsProblemsPanelWithWorkflowValidationIssues()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsDock = window.findChild<QDockWidget *>("problemsDock");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsDock != nullptr);
+    QVERIFY(problemsTable != nullptr);
+
+    QCOMPARE(problemsDock->windowTitle(), QString::fromUtf8("问题"));
+    QCOMPARE(problemsTable->rowCount(), 0);
+
+    editor->createNode("prompt");
+    editor->createNode("output");
+    QCoreApplication::processEvents();
+
+    QCOMPARE(problemsTable->rowCount(), 2);
+    QCOMPARE(problemsTable->horizontalHeaderItem(0)->text(), QString::fromUtf8("级别"));
+    QCOMPARE(problemsTable->horizontalHeaderItem(1)->text(), QString::fromUtf8("节点"));
+    QCOMPARE(problemsTable->horizontalHeaderItem(2)->text(), QString::fromUtf8("类型"));
+    QCOMPARE(problemsTable->horizontalHeaderItem(3)->text(), QString::fromUtf8("问题"));
+
+    QStringList messages;
+    for (int row = 0; row < problemsTable->rowCount(); ++row)
+        messages << problemsTable->item(row, 3)->text();
+    QVERIFY(messages.contains(QString::fromUtf8("提示词模板为空。")));
+    QVERIFY(messages.contains(QString::fromUtf8("输出节点需要输入连接。")));
+}
+
+void MainWindowTests::activatingProblemSelectsNodeAndHighlightsInspectorField()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.resize(1280, 840);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    auto *promptUserLabel = window.findChild<QLabel *>("inspectorPromptUserTemplateLabel");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsTable != nullptr);
+    QVERIFY(promptUserLabel != nullptr);
+
+    const auto promptNode = editor->createNode("prompt", QPointF(1800.0, 1300.0));
+    editor->createNode("output", QPointF(40.0, 40.0));
+    QCoreApplication::processEvents();
+
+    int promptProblemRow = -1;
+    for (int row = 0; row < problemsTable->rowCount(); ++row) {
+        if (problemsTable->item(row, 3)->text() == QString::fromUtf8("提示词模板为空。")) {
+            promptProblemRow = row;
+            break;
+        }
+    }
+    QVERIFY(promptProblemRow >= 0);
+
+    auto *messageItem = problemsTable->item(promptProblemRow, 3);
+    QVERIFY(messageItem != nullptr);
+    const QPoint activationPoint = problemsTable->visualItemRect(messageItem).center();
+    QTest::mouseClick(problemsTable->viewport(), Qt::LeftButton, Qt::NoModifier, activationPoint);
+    QCoreApplication::processEvents();
+
+    QCOMPARE(editor->selectedNodeDisplayName(), QString::fromUtf8("提示词"));
+    QCOMPARE(promptUserLabel->property("validationState").toString(), QString("warning"));
+
+    const QPointF centered = editor->viewportSceneCenter();
+    QVERIFY(qAbs(centered.x() - editor->nodePosition(promptNode).x()) < 400.0);
+    QVERIFY(qAbs(centered.y() - editor->nodePosition(promptNode).y()) < 300.0);
+}
+
+void MainWindowTests::problemsPanelRefreshesAfterIssueIsFixed()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    auto *promptUserEdit = window.findChild<QTextEdit *>("inspectorPromptUserTemplateEdit");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsTable != nullptr);
+    QVERIFY(promptUserEdit != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    editor->selectNode(promptNode);
+    QCoreApplication::processEvents();
+    QCOMPARE(problemsTable->rowCount(), 1);
+    QCOMPARE(problemsTable->item(0, 3)->text(), QString::fromUtf8("提示词模板为空。"));
+
+    promptUserEdit->setPlainText("Summarize {{input}}");
+    QCoreApplication::processEvents();
+
+    QCOMPARE(problemsTable->rowCount(), 0);
 }
 
 void MainWindowTests::keepsCanvasMiniMapHiddenWhenWorkflowIsEmpty()
@@ -1873,6 +1991,40 @@ void MainWindowTests::appliesDistinctNodeCardStylesByType()
     QVERIFY(startStyle != promptStyle);
     QVERIFY(promptStyle != llmStyle);
     QVERIFY(llmStyle != toolStyle);
+}
+
+void MainWindowTests::exposesAllCurrentValidationIssues()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    const auto promptNode = editor->createNode("prompt");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(promptNode != QtNodes::InvalidNodeId);
+    QVERIFY(outputNode != QtNodes::InvalidNodeId);
+
+    const auto issues = editor->validationIssues();
+    QCOMPARE(issues.size(), 2);
+
+    auto promptIssueIt = std::find_if(issues.cbegin(), issues.cend(), [promptNode](auto const &issue) {
+        return issue.nodeId == promptNode;
+    });
+    auto outputIssueIt = std::find_if(issues.cbegin(), issues.cend(), [outputNode](auto const &issue) {
+        return issue.nodeId == outputNode;
+    });
+    QVERIFY(promptIssueIt != issues.cend());
+    QVERIFY(outputIssueIt != issues.cend());
+
+    QCOMPARE(promptIssueIt->typeKey, QString("prompt"));
+    QCOMPARE(promptIssueIt->state, QString("warning"));
+    QCOMPARE(promptIssueIt->propertyKey, QString("userPromptTemplate"));
+    QCOMPARE(promptIssueIt->message, QString::fromUtf8("提示词模板为空。"));
+    QCOMPARE(outputIssueIt->typeKey, QString("output"));
+    QCOMPARE(outputIssueIt->state, QString("warning"));
+    QCOMPARE(outputIssueIt->message, QString::fromUtf8("输出节点需要输入连接。"));
 }
 
 void MainWindowTests::marksIncompletePromptNodeWithWarningValidationState()
