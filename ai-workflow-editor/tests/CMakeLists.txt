@@ -94,3 +94,21 @@ target_link_libraries(ai_workflow_editor_export_tests
 )
 
 add_test(NAME ai_workflow_editor_export_tests COMMAND ai_workflow_editor_export_tests)
+
+add_executable(ai_workflow_editor_workflow_tests
+  workflow/WorkflowDocumentTests.cpp
+  ../src/workflow/WorkflowDocument.cpp
+)
+
+target_include_directories(ai_workflow_editor_workflow_tests
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+
+target_link_libraries(ai_workflow_editor_workflow_tests
+  PRIVATE
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Test
+)
+
+add_test(NAME ai_workflow_editor_workflow_tests COMMAND ai_workflow_editor_workflow_tests)

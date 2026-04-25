@@ -7,6 +7,7 @@
 #include "qtnodes/EdgeAlignedNodeGeometry.hpp"
 #include "qtnodes/StaticNodeDelegateModel.hpp"
 #include "qtnodes/StyledNodePainter.hpp"
+#include "workflow/WorkflowDocument.hpp"
 
 #include <QtNodes/internal/ConnectionGraphicsObject.hpp>
 #include <QtNodes/internal/locateNode.hpp>
@@ -1050,48 +1051,36 @@ void QtNodesEditorWidget::setNodePositionInternal(QtNodes::NodeId nodeId, QPoint
 
 QJsonObject QtNodesEditorWidget::workflowToJson() const
 {
-    QJsonObject root;
-    root["version"] = 2;
-
-    QJsonArray nodes;
+    QVector<WorkflowDocument::NodeRecord> nodes;
     for (auto const nodeId : sortedNodeIds()) {
         auto const stateIt = _nodeStates.constFind(nodeId);
         if (stateIt == _nodeStates.cend())
             continue;
 
-        QJsonObject node;
-        node["id"] = static_cast<int>(nodeId);
-        node["type"] = stateIt->typeKey;
-        node["displayName"] = stateIt->displayName;
-        node["description"] = stateIt->description;
-        node["properties"] = QJsonObject::fromVariantMap(stateIt->properties);
-
-        const auto position = _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
-        QJsonObject positionObject;
-        positionObject["x"] = position.x();
-        positionObject["y"] = position.y();
-        node["position"] = positionObject;
-        nodes.push_back(node);
+        WorkflowDocument::NodeRecord node;
+        node.serializedId = static_cast<int>(nodeId);
+        node.typeKey = stateIt->typeKey;
+        node.displayName = stateIt->displayName;
+        node.description = stateIt->description;
+        node.properties = stateIt->properties;
+        node.position = _graphModel->nodeData(nodeId, QtNodes::NodeRole::Position).toPointF();
+        nodes.push_back(std::move(node));
     }
-    root["nodes"] = nodes;
 
-    QJsonArray connections;
+    QVector<WorkflowDocument::ConnectionRecord> connections;
     for (auto const nodeId : sortedNodeIds()) {
         for (auto const &connectionId : _graphModel->allConnectionIds(nodeId)) {
             if (connectionId.outNodeId != nodeId)
                 continue;
 
-            QJsonObject connection;
-            connection["outNodeId"] = static_cast<int>(connectionId.outNodeId);
-            connection["outPortIndex"] = static_cast<int>(connectionId.outPortIndex);
-            connection["inNodeId"] = static_cast<int>(connectionId.inNodeId);
-            connection["inPortIndex"] = static_cast<int>(connectionId.inPortIndex);
-            connections.push_back(connection);
+            connections.push_back(WorkflowDocument::ConnectionRecord{static_cast<int>(connectionId.outNodeId),
+                                                                      static_cast<int>(connectionId.outPortIndex),
+                                                                      static_cast<int>(connectionId.inNodeId),
+                                                                      static_cast<int>(connectionId.inPortIndex)});
         }
     }
-    root["connections"] = connections;
 
-    return root;
+    return WorkflowDocument(std::move(nodes), std::move(connections)).toJson();
 }
 
 bool QtNodesEditorWidget::saveWorkflow(QString const &filePath) const
@@ -1116,116 +1105,84 @@ bool QtNodesEditorWidget::loadWorkflow(QString const &filePath)
     if (!document.isObject())
         return false;
 
-    const auto root = document.object();
-    const int fileVersion = root["version"].toInt(1);
-    if (fileVersion < 1 || fileVersion > 2)
+    QString parseError;
+    const auto workflowDocument = WorkflowDocument::fromJson(document.object(), &parseError);
+    if (!workflowDocument)
         return false;
-
-    const auto nodes = root["nodes"].toArray();
-    const auto connections = root["connections"].toArray();
 
     struct ParsedNode
     {
-        int serializedId = 0;
-        QString typeKey;
-        QString displayName;
-        QString description;
-        QVariantMap properties;
-        QPointF position;
+        WorkflowDocument::NodeRecord record;
         bool displayNameCustomized = false;
         bool descriptionCustomized = false;
     };
 
-    struct ParsedConnection
-    {
-        int outSerializedNodeId = 0;
-        QtNodes::PortIndex outPortIndex = 0;
-        int inSerializedNodeId = 0;
-        QtNodes::PortIndex inPortIndex = 0;
-    };
-
     std::vector<ParsedNode> parsedNodes;
-    parsedNodes.reserve(static_cast<std::size_t>(nodes.size()));
-    std::vector<ParsedConnection> parsedConnections;
-    parsedConnections.reserve(static_cast<std::size_t>(connections.size()));
+    parsedNodes.reserve(static_cast<std::size_t>(workflowDocument->nodes().size()));
     QHash<int, QtNodes::NodeId> previewNodeIdMap;
     WorkflowGraphModel previewModel(_registry);
 
-    for (auto const &nodeValue : nodes) {
-        const auto nodeObject = nodeValue.toObject();
-        const auto positionObject = nodeObject["position"].toObject();
-        const QString typeKey = nodeObject["type"].toString();
-        auto const *definition = _builtInNodeRegistry.find(typeKey);
+    for (auto const &nodeRecord : workflowDocument->nodes()) {
+        auto const *definition = _builtInNodeRegistry.find(nodeRecord.typeKey);
         if (definition == nullptr)
             return false;
 
-        const int serializedId = nodeObject["id"].toInt(std::numeric_limits<int>::min());
-        if (serializedId == std::numeric_limits<int>::min() || previewNodeIdMap.contains(serializedId))
-            return false;
-
-        const auto previewNodeId = previewModel.addNode(typeKey);
+        const auto previewNodeId = previewModel.addNode(nodeRecord.typeKey);
         if (previewNodeId == QtNodes::InvalidNodeId)
             return false;
 
-        QVariantMap properties = nodeObject["properties"].toObject().toVariantMap();
+        QVariantMap properties = nodeRecord.properties;
         for (auto it = definition->defaultProperties.cbegin(); it != definition->defaultProperties.cend(); ++it) {
             if (!properties.contains(it.key()))
                 properties.insert(it.key(), it.value());
         }
 
         ParsedNode parsedNode;
-        parsedNode.serializedId = serializedId;
-        parsedNode.typeKey = typeKey;
-        parsedNode.displayName = nodeObject["displayName"].toString(definition->displayName);
-        parsedNode.description = nodeObject["description"].toString(definition->description);
-        parsedNode.properties = properties;
-        parsedNode.position = QPointF(positionObject["x"].toDouble(), positionObject["y"].toDouble());
-        parsedNode.displayNameCustomized = parsedNode.displayName != definition->displayName;
-        parsedNode.descriptionCustomized = parsedNode.description != definition->description;
+        parsedNode.record = nodeRecord;
+        parsedNode.record.displayName =
+            parsedNode.record.displayName.isEmpty() ? definition->displayName : parsedNode.record.displayName;
+        parsedNode.record.description =
+            parsedNode.record.description.isEmpty() ? definition->description : parsedNode.record.description;
+        parsedNode.record.properties = properties;
+        parsedNode.displayNameCustomized = parsedNode.record.displayName != definition->displayName;
+        parsedNode.descriptionCustomized = parsedNode.record.description != definition->description;
 
-        previewNodeIdMap.insert(serializedId, previewNodeId);
+        previewNodeIdMap.insert(nodeRecord.serializedId, previewNodeId);
         parsedNodes.push_back(std::move(parsedNode));
     }
 
-    for (auto const &connectionValue : connections) {
-        const auto connectionObject = connectionValue.toObject();
-        ParsedConnection parsedConnection;
-        parsedConnection.outSerializedNodeId = connectionObject["outNodeId"].toInt(std::numeric_limits<int>::min());
-        parsedConnection.outPortIndex =
-            static_cast<QtNodes::PortIndex>(connectionObject["outPortIndex"].toInt(std::numeric_limits<int>::min()));
-        parsedConnection.inSerializedNodeId = connectionObject["inNodeId"].toInt(std::numeric_limits<int>::min());
-        parsedConnection.inPortIndex =
-            static_cast<QtNodes::PortIndex>(connectionObject["inPortIndex"].toInt(std::numeric_limits<int>::min()));
-
-        const auto previewOutNodeId = previewNodeIdMap.value(parsedConnection.outSerializedNodeId, QtNodes::InvalidNodeId);
-        const auto previewInNodeId = previewNodeIdMap.value(parsedConnection.inSerializedNodeId, QtNodes::InvalidNodeId);
+    for (auto const &connectionRecord : workflowDocument->connections()) {
+        const auto previewOutNodeId = previewNodeIdMap.value(connectionRecord.outSerializedNodeId, QtNodes::InvalidNodeId);
+        const auto previewInNodeId = previewNodeIdMap.value(connectionRecord.inSerializedNodeId, QtNodes::InvalidNodeId);
         if (previewOutNodeId == QtNodes::InvalidNodeId || previewInNodeId == QtNodes::InvalidNodeId)
             return false;
 
         QtNodes::ConnectionId previewConnectionId{
-            previewOutNodeId, parsedConnection.outPortIndex, previewInNodeId, parsedConnection.inPortIndex};
+            previewOutNodeId,
+            static_cast<QtNodes::PortIndex>(connectionRecord.outPortIndex),
+            previewInNodeId,
+            static_cast<QtNodes::PortIndex>(connectionRecord.inPortIndex)};
         if (!previewModel.connectionPossible(previewConnectionId))
             return false;
 
         previewModel.addConnection(previewConnectionId);
-        parsedConnections.push_back(parsedConnection);
     }
 
     clearWorkflow();
 
     QHash<int, QtNodes::NodeId> nodeIdMap;
     for (auto const &parsedNode : parsedNodes) {
-        const auto nodeId = createNodeInternal(parsedNode.typeKey, parsedNode.position);
+        const auto nodeId = createNodeInternal(parsedNode.record.typeKey, parsedNode.record.position);
         if (nodeId == QtNodes::InvalidNodeId)
             return false;
 
-        nodeIdMap.insert(parsedNode.serializedId, nodeId);
+        nodeIdMap.insert(parsedNode.record.serializedId, nodeId);
         // Preserve explicit scene coordinates such as (0, 0) instead of falling back
         // to the default viewport-centered placement used by interactive node creation.
-        _graphModel->setNodeData(nodeId, QtNodes::NodeRole::Position, parsedNode.position);
-        _nodeStates[nodeId].displayName = parsedNode.displayName;
-        _nodeStates[nodeId].description = parsedNode.description;
-        _nodeStates[nodeId].properties = parsedNode.properties;
+        _graphModel->setNodeData(nodeId, QtNodes::NodeRole::Position, parsedNode.record.position);
+        _nodeStates[nodeId].displayName = parsedNode.record.displayName;
+        _nodeStates[nodeId].description = parsedNode.record.description;
+        _nodeStates[nodeId].properties = parsedNode.record.properties;
         _nodeStates[nodeId].displayNameCustomized = parsedNode.displayNameCustomized;
         _nodeStates[nodeId].descriptionCustomized = parsedNode.descriptionCustomized;
 
@@ -1235,14 +1192,17 @@ bool QtNodesEditorWidget::loadWorkflow(QString const &filePath)
         applyNodeStyle(nodeId, _nodeStates[nodeId].typeKey);
     }
 
-    for (auto const &parsedConnection : parsedConnections) {
-        const auto outNodeId = nodeIdMap.value(parsedConnection.outSerializedNodeId, QtNodes::InvalidNodeId);
-        const auto inNodeId = nodeIdMap.value(parsedConnection.inSerializedNodeId, QtNodes::InvalidNodeId);
+    for (auto const &connectionRecord : workflowDocument->connections()) {
+        const auto outNodeId = nodeIdMap.value(connectionRecord.outSerializedNodeId, QtNodes::InvalidNodeId);
+        const auto inNodeId = nodeIdMap.value(connectionRecord.inSerializedNodeId, QtNodes::InvalidNodeId);
         if (outNodeId == QtNodes::InvalidNodeId || inNodeId == QtNodes::InvalidNodeId)
             return false;
 
         QtNodes::ConnectionId connectionId{
-            outNodeId, parsedConnection.outPortIndex, inNodeId, parsedConnection.inPortIndex};
+            outNodeId,
+            static_cast<QtNodes::PortIndex>(connectionRecord.outPortIndex),
+            inNodeId,
+            static_cast<QtNodes::PortIndex>(connectionRecord.inPortIndex)};
         if (!_graphModel->connectionPossible(connectionId)) {
             return false;
         }

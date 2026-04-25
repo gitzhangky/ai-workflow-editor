@@ -315,6 +315,38 @@ QLabel#zoomIndicatorLabel {
     padding: 2px 8px;
 }
 
+QWidget#problemsPanel {
+    background: #fffaf2;
+}
+
+QLabel#problemsSummaryLabel {
+    color: #6a5f54;
+    font-weight: 600;
+}
+
+QComboBox#problemsFilterComboBox {
+    background: #fffdf9;
+    border: 1px solid #ddd2c2;
+    border-radius: 8px;
+    color: #4f453c;
+    min-width: 108px;
+    padding: 5px 9px;
+}
+
+QComboBox#problemsFilterComboBox:hover {
+    background: #fbf3e8;
+    border-color: #d0c1ab;
+}
+
+QLabel#problemsEmptyStateLabel {
+    background: #fbf3e8;
+    border: 1px dashed #d8cdbb;
+    border-radius: 12px;
+    color: #7a6d5f;
+    font-weight: 600;
+    padding: 16px;
+}
+
 QTableWidget#problemsTable {
     background: #fffaf2;
     alternate-background-color: #fbf3e8;

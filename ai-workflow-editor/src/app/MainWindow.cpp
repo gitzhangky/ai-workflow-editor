@@ -11,6 +11,7 @@
 #include <QAbstractItemView>
 #include <QCloseEvent>
 #include <QColor>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QEvent>
@@ -18,6 +19,7 @@
 #include <QFileInfo>
 #include <QFont>
 #include <QHeaderView>
+#include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
@@ -75,6 +77,9 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _editorWidget(nullptr)
     , _helpWidget(nullptr)
     , _selectionValidationSummaryLabel(nullptr)
+    , _problemsSummaryLabel(nullptr)
+    , _problemsFilterComboBox(nullptr)
+    , _problemsEmptyStateLabel(nullptr)
     , _problemsTable(nullptr)
     , _newAction(nullptr)
     , _openAction(nullptr)
@@ -256,7 +261,32 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
 
     _problemsDock = new QDockWidget(this);
     _problemsDock->setObjectName("problemsDock");
-    _problemsTable = new QTableWidget(_problemsDock);
+    auto *problemsPanel = new QWidget(_problemsDock);
+    problemsPanel->setObjectName("problemsPanel");
+    auto *problemsLayout = new QVBoxLayout(problemsPanel);
+    problemsLayout->setContentsMargins(12, 10, 12, 12);
+    problemsLayout->setSpacing(8);
+
+    auto *problemsHeader = new QWidget(problemsPanel);
+    problemsHeader->setObjectName("problemsHeader");
+    auto *problemsHeaderLayout = new QHBoxLayout(problemsHeader);
+    problemsHeaderLayout->setContentsMargins(0, 0, 0, 0);
+    problemsHeaderLayout->setSpacing(8);
+    _problemsSummaryLabel = new QLabel(problemsHeader);
+    _problemsSummaryLabel->setObjectName("problemsSummaryLabel");
+    _problemsFilterComboBox = new QComboBox(problemsHeader);
+    _problemsFilterComboBox->setObjectName("problemsFilterComboBox");
+    problemsHeaderLayout->addWidget(_problemsSummaryLabel, 1);
+    problemsHeaderLayout->addWidget(_problemsFilterComboBox);
+    problemsLayout->addWidget(problemsHeader);
+
+    _problemsEmptyStateLabel = new QLabel(problemsPanel);
+    _problemsEmptyStateLabel->setObjectName("problemsEmptyStateLabel");
+    _problemsEmptyStateLabel->setAlignment(Qt::AlignCenter);
+    _problemsEmptyStateLabel->setWordWrap(true);
+    problemsLayout->addWidget(_problemsEmptyStateLabel, 1);
+
+    _problemsTable = new QTableWidget(problemsPanel);
     _problemsTable->setObjectName("problemsTable");
     _problemsTable->setColumnCount(4);
     _problemsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -271,7 +301,8 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _problemsTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     _problemsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     _problemsTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-    _problemsDock->setWidget(_problemsTable);
+    problemsLayout->addWidget(_problemsTable, 1);
+    _problemsDock->setWidget(problemsPanel);
     addDockWidget(Qt::BottomDockWidgetArea, _problemsDock);
     _toggleProblemsAction->setChecked(true);
 
@@ -468,6 +499,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_nodeLibraryDock, &QDockWidget::visibilityChanged, _toggleNodeLibraryAction, &QAction::setChecked);
     connect(_inspectorDock, &QDockWidget::visibilityChanged, _toggleInspectorAction, &QAction::setChecked);
     connect(_problemsDock, &QDockWidget::visibilityChanged, _toggleProblemsAction, &QAction::setChecked);
+    connect(_problemsFilterComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int) { updateProblemsPanel(); });
     connect(_problemsTable, &QTableWidget::cellClicked, this, [this](int row, int) {
         activateProblemRow(row);
     });
@@ -599,11 +634,36 @@ void MainWindow::updateProblemsPanel()
     }
 
     const auto issues = _editorWidget->validationIssues();
-    _problemsTable->setRowCount(issues.size());
+    int warningCount = 0;
+    int errorCount = 0;
+    for (auto const &issue : issues) {
+        if (issue.state == QStringLiteral("error"))
+            ++errorCount;
+        else if (issue.state == QStringLiteral("warning"))
+            ++warningCount;
+    }
+
+    if (_problemsDock != nullptr)
+        _problemsDock->setWindowTitle(tr("Problems (%1)").arg(issues.size()));
+    if (_problemsSummaryLabel != nullptr) {
+        _problemsSummaryLabel->setText(
+            tr("%1 problems: %2 errors, %3 warnings").arg(issues.size()).arg(errorCount).arg(warningCount));
+    }
+
+    const QString filterKey = _problemsFilterComboBox != nullptr
+                                  ? _problemsFilterComboBox->currentData().toString()
+                                  : QStringLiteral("all");
+    QList<QtNodesEditorWidget::ValidationIssue> visibleIssues;
+    for (auto const &issue : issues) {
+        if (filterKey == QStringLiteral("all") || issue.state == filterKey)
+            visibleIssues.push_back(issue);
+    }
+
+    _problemsTable->setRowCount(visibleIssues.size());
 
     int rowToSelect = -1;
-    for (int row = 0; row < issues.size(); ++row) {
-        auto const &issue = issues.at(row);
+    for (int row = 0; row < visibleIssues.size(); ++row) {
+        auto const &issue = visibleIssues.at(row);
         auto *levelItem = new QTableWidgetItem(issue.state);
         levelItem->setData(Qt::UserRole, static_cast<int>(issue.nodeId));
         levelItem->setData(Qt::UserRole + 1, issue.propertyKey);
@@ -621,6 +681,15 @@ void MainWindow::updateProblemsPanel()
             && issue.message == selectedMessage) {
             rowToSelect = row;
         }
+    }
+
+    const bool hasVisibleIssues = !visibleIssues.isEmpty();
+    _problemsTable->setVisible(hasVisibleIssues);
+    if (_problemsEmptyStateLabel != nullptr) {
+        _problemsEmptyStateLabel->setText(issues.isEmpty()
+                                              ? tr("No workflow problems. The current workflow is ready to save or export.")
+                                              : tr("No problems match the current filter."));
+        _problemsEmptyStateLabel->setVisible(!hasVisibleIssues);
     }
 
     if (rowToSelect >= 0) {
@@ -759,6 +828,16 @@ void MainWindow::retranslateUi()
     _nodeLibraryDock->setWindowTitle(tr("Node Library"));
     _inspectorDock->setWindowTitle(tr("Inspector"));
     _problemsDock->setWindowTitle(tr("Problems"));
+    if (_problemsFilterComboBox != nullptr) {
+        const QString currentFilter = _problemsFilterComboBox->currentData().toString();
+        const QSignalBlocker blocker(_problemsFilterComboBox);
+        _problemsFilterComboBox->clear();
+        _problemsFilterComboBox->addItem(tr("All"), QStringLiteral("all"));
+        _problemsFilterComboBox->addItem(tr("Errors"), QStringLiteral("error"));
+        _problemsFilterComboBox->addItem(tr("Warnings"), QStringLiteral("warning"));
+        const int filterIndex = _problemsFilterComboBox->findData(currentFilter.isEmpty() ? QStringLiteral("all") : currentFilter);
+        _problemsFilterComboBox->setCurrentIndex(filterIndex >= 0 ? filterIndex : 0);
+    }
     if (_problemsTable != nullptr) {
         _problemsTable->setHorizontalHeaderLabels(
             {tr("Level"), tr("Node"), tr("Type"), tr("Problem")});
@@ -977,8 +1056,9 @@ void MainWindow::rebuildRecentFilesMenu()
 
 void MainWindow::exportWorkflow(WorkflowExporter::Format format)
 {
-    if (_editorWidget == nullptr || _editorWidget->nodeCount() == 0) {
-        QMessageBox::information(this, tr("Export"), tr("No workflow to export."));
+    const QString readinessMessage = exportReadinessMessageForCurrentWorkflow();
+    if (!readinessMessage.isEmpty()) {
+        QMessageBox::warning(this, tr("Export Preflight"), readinessMessage);
         return;
     }
 
@@ -1007,6 +1087,22 @@ void MainWindow::exportWorkflow(WorkflowExporter::Format format)
 
     file.write(result.code.toUtf8());
     statusBar()->showMessage(tr("Exported to %1").arg(filePath));
+}
+
+QString MainWindow::exportReadinessMessageForCurrentWorkflow() const
+{
+    if (_editorWidget == nullptr || _editorWidget->nodeCount() == 0)
+        return tr("No workflow to export.");
+
+    const auto issues = _editorWidget->validationIssues();
+    if (issues.isEmpty())
+        return {};
+
+    QStringList lines;
+    lines << tr("Please fix %1 workflow problems before exporting:").arg(issues.size());
+    for (auto const &issue : issues)
+        lines << tr("- %1: %2").arg(issue.displayName, issue.message);
+    return lines.join(QLatin1Char('\n'));
 }
 
 void MainWindow::openHelpTab()

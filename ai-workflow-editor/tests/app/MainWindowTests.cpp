@@ -11,6 +11,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QComboBox>
 #include <QDockWidget>
 #include <QDir>
 #include <QFile>
@@ -105,6 +106,8 @@ private slots:
     void createsMenuBarWithFileViewAndSettingsMenus();
     void exposesCanvasArrangeActionsForMultiSelection();
     void showsProblemsPanelWithWorkflowValidationIssues();
+    void problemsPanelShowsCountAndEmptyState();
+    void problemsPanelFiltersIssuesBySeverity();
     void activatingProblemSelectsNodeAndHighlightsInspectorField();
     void problemsPanelRefreshesAfterIssueIsFixed();
     void problemsPanelRefreshesAfterTypingFixInInspector();
@@ -216,6 +219,7 @@ private slots:
     void fileMenuContainsExportSubmenu();
     void exportActionsDisabledWhenNoNodes();
     void exportActionsEnabledWhenNodesExist();
+    void exportReadinessReportsEmptyInvalidAndValidWorkflow();
 };
 
 void MainWindowTests::initTestCase()
@@ -539,6 +543,8 @@ void MainWindowTests::exposesCanvasArrangeActionsForMultiSelection()
 {
     LanguageManager languageManager;
     MainWindow window(&languageManager);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
 
     auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
     auto *alignLeftAction = window.findChild<QAction *>("alignLeftAction");
@@ -585,7 +591,7 @@ void MainWindowTests::showsProblemsPanelWithWorkflowValidationIssues()
     QVERIFY(problemsDock != nullptr);
     QVERIFY(problemsTable != nullptr);
 
-    QCOMPARE(problemsDock->windowTitle(), QString::fromUtf8("问题"));
+    QVERIFY(problemsDock->windowTitle().startsWith(QString::fromUtf8("问题")));
     QCOMPARE(problemsTable->rowCount(), 0);
     QVERIFY(problemsTable->hasMouseTracking());
     QVERIFY(problemsTable->viewport()->hasMouseTracking());
@@ -607,6 +613,69 @@ void MainWindowTests::showsProblemsPanelWithWorkflowValidationIssues()
         messages << problemsTable->item(row, 3)->text();
     QVERIFY(messages.contains(QString::fromUtf8("提示词模板为空。")));
     QVERIFY(messages.contains(QString::fromUtf8("输出节点需要输入连接。")));
+}
+
+void MainWindowTests::problemsPanelShowsCountAndEmptyState()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsDock = window.findChild<QDockWidget *>("problemsDock");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    auto *emptyStateLabel = window.findChild<QLabel *>("problemsEmptyStateLabel");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsDock != nullptr);
+    QVERIFY(problemsTable != nullptr);
+    QVERIFY(emptyStateLabel != nullptr);
+
+    QCOMPARE(problemsDock->windowTitle(), QString::fromUtf8("问题 (0)"));
+    QVERIFY(emptyStateLabel->isVisible());
+    QVERIFY(!problemsTable->isVisible());
+
+    editor->createNode("prompt");
+    editor->createNode("output");
+    QCoreApplication::processEvents();
+
+    QCOMPARE(problemsDock->windowTitle(), QString::fromUtf8("问题 (2)"));
+    QVERIFY(!emptyStateLabel->isVisible());
+    QVERIFY(problemsTable->isVisible());
+}
+
+void MainWindowTests::problemsPanelFiltersIssuesBySeverity()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *problemsTable = window.findChild<QTableWidget *>("problemsTable");
+    auto *filterComboBox = window.findChild<QComboBox *>("problemsFilterComboBox");
+    QVERIFY(editor != nullptr);
+    QVERIFY(problemsTable != nullptr);
+    QVERIFY(filterComboBox != nullptr);
+
+    const auto templateVariablesNode = editor->createNode("templateVariables");
+    editor->selectNode(templateVariablesNode);
+    editor->setSelectedNodeProperty("variablesJson", "{bad json");
+    editor->createNode("prompt");
+    QCoreApplication::processEvents();
+    QCOMPARE(problemsTable->rowCount(), 2);
+
+    filterComboBox->setCurrentIndex(filterComboBox->findData(QString("error")));
+    QCoreApplication::processEvents();
+    QCOMPARE(problemsTable->rowCount(), 1);
+    QCOMPARE(problemsTable->item(0, 0)->text(), QString("error"));
+
+    filterComboBox->setCurrentIndex(filterComboBox->findData(QString("warning")));
+    QCoreApplication::processEvents();
+    QCOMPARE(problemsTable->rowCount(), 1);
+    QCOMPARE(problemsTable->item(0, 0)->text(), QString("warning"));
+
+    filterComboBox->setCurrentIndex(filterComboBox->findData(QString("all")));
+    QCoreApplication::processEvents();
+    QCOMPARE(problemsTable->rowCount(), 2);
 }
 
 void MainWindowTests::activatingProblemSelectsNodeAndHighlightsInspectorField()
@@ -4148,6 +4217,31 @@ void MainWindowTests::exportActionsEnabledWhenNodesExist()
     QVERIFY(pythonAction != nullptr);
     QVERIFY(langChainAction->isEnabled());
     QVERIFY(pythonAction->isEnabled());
+}
+
+void MainWindowTests::exportReadinessReportsEmptyInvalidAndValidWorkflow()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    QVERIFY(editor != nullptr);
+
+    QVERIFY(window.exportReadinessMessageForCurrentWorkflow().contains(QString::fromUtf8("没有可导出的工作流")));
+
+    editor->createNode("prompt");
+    QCoreApplication::processEvents();
+    const QString invalidMessage = window.exportReadinessMessageForCurrentWorkflow();
+    QVERIFY(invalidMessage.contains(QString::fromUtf8("请先修复")));
+    QVERIFY(invalidMessage.contains(QString::fromUtf8("提示词模板为空。")));
+
+    editor->clearWorkflow();
+    const auto startNode = editor->createNode("start");
+    const auto outputNode = editor->createNode("output");
+    QVERIFY(editor->connectNodes(startNode, 0, outputNode, 0));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(window.exportReadinessMessageForCurrentWorkflow(), QString());
 }
 
 QTEST_MAIN(MainWindowTests)

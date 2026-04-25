@@ -359,9 +359,11 @@ QString HelpDocumentWidget::buildHelpContent() const
         html += QStringLiteral(
             "<p>The bottom <b>Problems</b> panel lists every current workflow warning or error.</p>"
             "<ul>"
+            "<li>The title shows the total count, and the filter can switch between All, Errors, and Warnings.</li>"
             "<li>Rows show severity, node name, node type, and the issue message.</li>"
             "<li>Click a row to select that node, center the canvas, and highlight the relevant Inspector field.</li>"
             "<li>Fixing a node immediately refreshes the list, so resolved problems disappear.</li>"
+            "<li>Export preflight uses this same list. Fix Problems before exporting code.</li>"
             "</ul>");
 
         html += QStringLiteral("<h2>Arranging Larger Workflows</h2>");
@@ -452,7 +454,8 @@ QString HelpDocumentWidget::buildHelpContent() const
         "<p>工作流保存为 JSON 文件。窗口标题出现 <code>*</code> 表示有未保存更改。"
         "导出入口在 <b>文件 &gt; 导出</b>，当前支持 Python (LangChain)、Python (LangGraph)、"
         "Python (CrewAI) 和 Python 脚本。</p>"
-        "<div class='tip'>导出结果是代码骨架，适合作为开发起点，再到自己的工程里补充真实运行逻辑。</div>");
+        "<div class='tip'>导出前会先做预检。如果底部问题面板里还有 warning / error，编辑器会先提示需要修复的节点问题，"
+        "不会直接打开导出文件对话框。导出结果是代码骨架，适合作为开发起点，再到自己的工程里补充真实运行逻辑。</div>");
 
     html += QStringLiteral("<h2>画布导航</h2>");
     html += QStringLiteral(
@@ -467,9 +470,11 @@ QString HelpDocumentWidget::buildHelpContent() const
     html += QStringLiteral(
         "<p>底部 <b>问题</b> 面板会汇总当前工作流中的所有 warning / error。</p>"
         "<ul>"
+        "<li>标题会显示总数，例如 <b>问题 (2)</b>；右上角可以按全部、错误、警告过滤。</li>"
         "<li>每一行会显示级别、节点名称、节点类型和问题描述。</li>"
         "<li>点击某一行会自动选中对应节点、居中画布，并高亮相关 Inspector 字段。</li>"
         "<li>修复节点后列表会立即刷新，已经解决的问题会自动消失。</li>"
+        "<li>导出预检也使用同一份问题列表；导出前建议先清到 <b>问题 (0)</b>。</li>"
         "</ul>");
 
     html += QStringLiteral("<h2>整理大型工作流</h2>");

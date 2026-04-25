@@ -8,6 +8,7 @@
 
 class QAction;
 class QCloseEvent;
+class QComboBox;
 class InspectorPanel;
 class NodeLibraryListWidget;
 class QDockWidget;
@@ -35,6 +36,7 @@ public:
     bool loadWorkflowFromPath(QString const &filePath);
     bool isDirty() const;
     QStringList recentFiles() const;
+    QString exportReadinessMessageForCurrentWorkflow() const;
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -81,6 +83,9 @@ private:
     HelpDocumentWidget *_helpWidget;
     QLabel *_selectionValidationSummaryLabel;
     QLabel *_zoomIndicatorLabel;
+    QLabel *_problemsSummaryLabel;
+    QComboBox *_problemsFilterComboBox;
+    QLabel *_problemsEmptyStateLabel;
     QTableWidget *_problemsTable;
     QAction *_newAction;
     QAction *_openAction;

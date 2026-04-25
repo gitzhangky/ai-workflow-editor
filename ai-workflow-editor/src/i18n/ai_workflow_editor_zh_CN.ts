@@ -169,6 +169,13 @@
     <message><source>Node Library</source><translation>节点库</translation></message>
     <message><source>Inspector</source><translation>属性面板</translation></message>
     <message><source>Problems</source><translation>问题</translation></message>
+    <message><source>Problems (%1)</source><translation>问题 (%1)</translation></message>
+    <message><source>%1 problems: %2 errors, %3 warnings</source><translation>%1 个问题：%2 个错误，%3 个警告</translation></message>
+    <message><source>No workflow problems. The current workflow is ready to save or export.</source><translation>当前工作流没有问题，可以保存或导出。</translation></message>
+    <message><source>No problems match the current filter.</source><translation>没有匹配当前过滤条件的问题。</translation></message>
+    <message><source>All</source><translation>全部</translation></message>
+    <message><source>Errors</source><translation>错误</translation></message>
+    <message><source>Warnings</source><translation>警告</translation></message>
     <message><source>Level</source><translation>级别</translation></message>
     <message><source>Node</source><translation>节点</translation></message>
     <message><source>Type</source><translation>类型</translation></message>
@@ -189,12 +196,15 @@
     <message><source>Delete</source><translation>删除</translation></message>
     <message><source>Select All</source><translation>全选</translation></message>
     <message><source>Export</source><translation>导出</translation></message>
+    <message><source>Export Preflight</source><translation>导出预检</translation></message>
     <message><source>Python (LangChain)</source><translation>Python (LangChain)</translation></message>
     <message><source>Python Script</source><translation>Python 脚本</translation></message>
     <message><source>Python (LangGraph)</source><translation>Python (LangGraph)</translation></message>
     <message><source>Python (CrewAI)</source><translation>Python (CrewAI)</translation></message>
     <message><source>Export Workflow</source><translation>导出工作流</translation></message>
     <message><source>No workflow to export.</source><translation>没有可导出的工作流。</translation></message>
+    <message><source>Please fix %1 workflow problems before exporting:</source><translation>导出前请先修复 %1 个工作流问题：</translation></message>
+    <message><source>- %1: %2</source><translation>- %1：%2</translation></message>
     <message><source>Export Failed</source><translation>导出失败</translation></message>
     <message><source>Cannot write to file: %1</source><translation>无法写入文件：%1</translation></message>
     <message><source>Exported to %1</source><translation>已导出至 %1</translation></message>

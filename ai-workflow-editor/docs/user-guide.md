@@ -260,9 +260,13 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 
 菜单入口：`文件 -> 导出`
 
-支持两种格式：
+导出前编辑器会先做一次预检。如果底部 `问题` 面板里还有 warning / error，会先提示需要修复的节点问题，不会直接打开导出文件对话框。建议先把问题面板清到 `问题 (0)`，再导出代码。
+
+支持四种格式：
 
 - **Python (LangChain)** — 生成使用 LangChain 框架的代码，包含 `ChatPromptTemplate`、`ChatOpenAI`、`AgentExecutor` 等组件，并自动组装 chain
+- **Python (LangGraph)** — 生成 LangGraph 风格的图结构代码骨架
+- **Python (CrewAI)** — 生成 CrewAI 风格的 Agent / Task / Crew 代码骨架
 - **Python 脚本** — 生成纯 Python 函数式代码，每个节点对应一个函数，最后有 `run_workflow()` 串联整个流程
 
 导出的代码包含 `TODO` 注释标记需要补充的实现细节（如工具逻辑、条件判断等）。
@@ -376,6 +380,8 @@ cmake --build /Users/zhangkaiyuan/Documents/Codex/2026-04-21-github-qt-c-nodeedi
 ### 问题面板
 
 底部 `问题` 面板会列出当前工作流里的所有 warning / error，包括节点名称、节点类型和问题描述。
+
+面板标题会显示当前问题总数，例如 `问题 (2)`。右上角可以按 `全部` / `错误` / `警告` 过滤，方便在节点很多时先处理会阻断导出的错误，再处理配置提醒。没有问题时会显示空状态，表示当前工作流可以保存或导出。
 
 常见用法：
 
