@@ -2,6 +2,7 @@
 
 #include "app/HelpDocumentWidget.hpp"
 #include "app/NodeLibraryListWidget.hpp"
+#include "app/RunPreviewWidget.hpp"
 #include "app/WorkbenchTabWidget.hpp"
 #include "inspector/InspectorPanel.hpp"
 #include "qtnodes/QtNodesEditorWidget.hpp"
@@ -76,6 +77,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _tabWidget(nullptr)
     , _editorWidget(nullptr)
     , _helpWidget(nullptr)
+    , _runPreviewWidget(nullptr)
     , _selectionValidationSummaryLabel(nullptr)
     , _problemsSummaryLabel(nullptr)
     , _problemsFilterComboBox(nullptr)
@@ -90,6 +92,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     , _exportPythonAction(nullptr)
     , _exportLangGraphAction(nullptr)
     , _exportCrewAIAction(nullptr)
+    , _runPreviewAction(nullptr)
     , _copyAction(nullptr)
     , _pasteAction(nullptr)
     , _duplicateAction(nullptr)
@@ -166,6 +169,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _exportLangGraphAction->setObjectName("exportLangGraphAction");
     _exportCrewAIAction = new QAction(this);
     _exportCrewAIAction->setObjectName("exportCrewAIAction");
+    _runPreviewAction = _primaryToolBar->addAction(toolbarIcon(QStringLiteral("run-preview")), QString());
+    _runPreviewAction->setObjectName("runPreviewAction");
+    _runPreviewAction->setProperty("emphasis", QStringLiteral("primary"));
+    _primaryToolBar->addSeparator();
     _copyAction = new QAction(this);
     _copyAction->setObjectName("copyAction");
     _pasteAction = new QAction(this);
@@ -309,6 +316,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     _tabWidget = new WorkbenchTabWidget(this);
     _editorWidget = new QtNodesEditorWidget(_tabWidget);
     _helpWidget = nullptr;
+    _runPreviewWidget = nullptr;
     _tabWidget->addTab(_editorWidget, tr("Workflow"));
     _tabWidget->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr);
     _tabWidget->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
@@ -388,6 +396,10 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     });
     connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::markDirty);
     connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, &MainWindow::updateProblemsPanel);
+    connect(_editorWidget, &QtNodesEditorWidget::workflowModified, this, [this]() {
+        if (_runPreviewWidget != nullptr)
+            _runPreviewWidget->setWorkflow(_editorWidget->workflowToJson());
+    });
     connect(_editorWidget, &QtNodesEditorWidget::cleanStateChanged, this, [this](bool clean) {
         if (clean)
             clearDirty();
@@ -455,6 +467,7 @@ MainWindow::MainWindow(LanguageManager *languageManager, QWidget *parent)
     connect(_exportCrewAIAction, &QAction::triggered, this, [this]() {
         exportWorkflow(WorkflowExporter::Format::PythonCrewAI);
     });
+    connect(_runPreviewAction, &QAction::triggered, this, &MainWindow::openRunPreviewTab);
 
     connect(_copyAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::copySelection);
     connect(_pasteAction, &QAction::triggered, _editorWidget, &QtNodesEditorWidget::pasteClipboard);
@@ -787,6 +800,7 @@ void MainWindow::retranslateUi()
     _exportPythonAction->setText(tr("Python Script"));
     _exportLangGraphAction->setText(tr("Python (LangGraph)"));
     _exportCrewAIAction->setText(tr("Python (CrewAI)"));
+    _runPreviewAction->setText(tr("Run Preview"));
     _recentFilesMenu->setTitle(tr("Recent Files"));
     _copyAction->setText(tr("Copy"));
     _pasteAction->setText(tr("Paste"));
@@ -878,6 +892,8 @@ void MainWindow::retranslateUi()
     _editMenu->addAction(_deleteAction);
 
     _viewMenu->clear();
+    _viewMenu->addAction(_runPreviewAction);
+    _viewMenu->addSeparator();
     _viewMenu->addAction(_centerAction);
     _viewMenu->addAction(_fitWorkflowAction);
     _viewMenu->addSeparator();
@@ -910,6 +926,12 @@ void MainWindow::retranslateUi()
         if (helpIndex >= 0)
             _tabWidget->setTabText(helpIndex, tr("User Guide"));
         _helpWidget->retranslateUi();
+    }
+    if (_runPreviewWidget != nullptr) {
+        const int runPreviewIndex = _tabWidget->indexOf(_runPreviewWidget);
+        if (runPreviewIndex >= 0)
+            _tabWidget->setTabText(runPreviewIndex, tr("Run Preview"));
+        _runPreviewWidget->retranslateUi();
     }
 
     updateWindowTitle();
@@ -1113,6 +1135,19 @@ void MainWindow::openHelpTab()
         _tabWidget->addClosableTab(_helpWidget, tr("User Guide"));
     } else {
         _tabWidget->activateOrAddTab(_helpWidget, tr("User Guide"));
+    }
+}
+
+void MainWindow::openRunPreviewTab()
+{
+    if (_runPreviewWidget == nullptr) {
+        _runPreviewWidget = new RunPreviewWidget(_tabWidget);
+        _runPreviewWidget->setWorkflow(_editorWidget->workflowToJson());
+        connect(_runPreviewWidget, &QObject::destroyed, this, [this]() { _runPreviewWidget = nullptr; });
+        _tabWidget->addClosableTab(_runPreviewWidget, tr("Run Preview"));
+    } else {
+        _runPreviewWidget->setWorkflow(_editorWidget->workflowToJson());
+        _tabWidget->activateOrAddTab(_runPreviewWidget, tr("Run Preview"));
     }
 }
 

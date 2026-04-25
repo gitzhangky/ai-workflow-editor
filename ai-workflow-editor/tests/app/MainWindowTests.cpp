@@ -23,6 +23,7 @@
 #include <QMenuBar>
 #include <QMimeData>
 #include <QDoubleSpinBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QSet>
 #include <QSpinBox>
@@ -97,6 +98,8 @@ private slots:
     void createsNodeLibraryAndInspectorDocks();
     void createsWorkflowCanvasInCentralArea();
     void opensUserGuideInReusableWorkbenchTab();
+    void opensRunPreviewInReusableWorkbenchTab();
+    void runPreviewProducesTraceFromCurrentWorkflow();
     void userGuideCoversCoreWorkflowTasksWithVisualDiagrams();
     void preservesDockVisibilityPreferenceWhenSwitchingHelpTab();
     void appliesLightWorkbenchCanvasBackground();
@@ -308,6 +311,74 @@ void MainWindowTests::opensUserGuideInReusableWorkbenchTab()
     QCOMPARE(tabs->currentIndex(), 1);
 }
 
+void MainWindowTests::opensRunPreviewInReusableWorkbenchTab()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *tabs = qobject_cast<QTabWidget *>(window.centralWidget());
+    auto *runPreviewAction = window.findChild<QAction *>("runPreviewAction");
+    QVERIFY(tabs != nullptr);
+    QVERIFY(runPreviewAction != nullptr);
+    QCOMPARE(tabs->count(), 1);
+
+    runPreviewAction->trigger();
+    QCOMPARE(tabs->count(), 2);
+    QCOMPARE(tabs->currentIndex(), 1);
+    QCOMPARE(tabs->tabText(1), QString::fromUtf8("运行预览"));
+
+    auto *runPreviewWidget = tabs->widget(1);
+    QVERIFY(runPreviewWidget != nullptr);
+    QCOMPARE(runPreviewWidget->objectName(), QString("runPreviewWidget"));
+    QVERIFY(runPreviewWidget->findChild<QTextEdit *>("runPreviewInputEdit") != nullptr);
+    QVERIFY(runPreviewWidget->findChild<QPushButton *>("runPreviewRunButton") != nullptr);
+    QVERIFY(runPreviewWidget->findChild<QTableWidget *>("runPreviewTraceTable") != nullptr);
+    QVERIFY(runPreviewWidget->findChild<QTextEdit *>("runPreviewOutputEdit") != nullptr);
+
+    runPreviewAction->trigger();
+    QCOMPARE(tabs->count(), 2);
+    QCOMPARE(tabs->currentIndex(), 1);
+}
+
+void MainWindowTests::runPreviewProducesTraceFromCurrentWorkflow()
+{
+    LanguageManager languageManager;
+    MainWindow window(&languageManager);
+
+    auto *editor = window.findChild<QtNodesEditorWidget *>("workflowCanvas");
+    auto *runPreviewAction = window.findChild<QAction *>("runPreviewAction");
+    QVERIFY(editor != nullptr);
+    QVERIFY(runPreviewAction != nullptr);
+
+    const auto startNode = editor->createNode("start");
+    const auto promptNode = editor->createNode("prompt");
+    const auto llmNode = editor->createNode("llm");
+    const auto outputNode = editor->createNode("output");
+    editor->selectNode(promptNode);
+    editor->setSelectedNodeProperty("userPromptTemplate", "Summarize: {{input}}");
+    QVERIFY(editor->connectNodes(startNode, 0, promptNode, 0));
+    QVERIFY(editor->connectNodes(promptNode, 0, llmNode, 0));
+    QVERIFY(editor->connectNodes(llmNode, 0, outputNode, 0));
+
+    runPreviewAction->trigger();
+    auto *inputEdit = window.findChild<QTextEdit *>("runPreviewInputEdit");
+    auto *runButton = window.findChild<QPushButton *>("runPreviewRunButton");
+    auto *traceTable = window.findChild<QTableWidget *>("runPreviewTraceTable");
+    auto *outputEdit = window.findChild<QTextEdit *>("runPreviewOutputEdit");
+    QVERIFY(inputEdit != nullptr);
+    QVERIFY(runButton != nullptr);
+    QVERIFY(traceTable != nullptr);
+    QVERIFY(outputEdit != nullptr);
+
+    inputEdit->setPlainText("A long document");
+    runButton->click();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(traceTable->rowCount(), 4);
+    QVERIFY(outputEdit->toPlainText().contains(QString("Mock LLM response")));
+    QVERIFY(outputEdit->toPlainText().contains(QString("Summarize: A long document")));
+}
+
 void MainWindowTests::userGuideCoversCoreWorkflowTasksWithVisualDiagrams()
 {
     LanguageManager languageManager;
@@ -328,6 +399,8 @@ void MainWindowTests::userGuideCoversCoreWorkflowTasksWithVisualDiagrams()
     const QString plainText = browser->toPlainText();
     QVERIFY(plainText.contains(QString::fromUtf8("图文导览")));
     QVERIFY(plainText.contains(QString::fromUtf8("5 分钟路线")));
+    QVERIFY(plainText.contains(QString::fromUtf8("运行预览")));
+    QVERIFY(plainText.contains(QString::fromUtf8("Mock")));
     QVERIFY(plainText.contains(QString::fromUtf8("开始 → 提示词 → 大模型 → 输出")));
     QVERIFY(plainText.contains(QString::fromUtf8("连线只允许从输出端口拖到输入端口")));
     QVERIFY(plainText.contains(QString::fromUtf8("节点出现 warning / error")));
@@ -448,9 +521,10 @@ void MainWindowTests::createsPrimaryToolbarAndStatusBar()
 
     auto *toolbar = window.findChild<QToolBar *>("primaryToolBar");
     QVERIFY(toolbar != nullptr);
-    QCOMPARE(toolbar->actions().size(), 13);
+    QCOMPARE(toolbar->actions().size(), 15);
     QCOMPARE(toolbar->actions().at(0)->text(), QString::fromUtf8("新建"));
     QCOMPARE(toolbar->actions().at(2)->text(), QString::fromUtf8("保存"));
+    QCOMPARE(toolbar->actions().at(4)->text(), QString::fromUtf8("运行预览"));
 
     QVERIFY(window.statusBar() != nullptr);
 }
@@ -464,20 +538,22 @@ void MainWindowTests::showsGroupedToolbarLayout()
     QVERIFY(toolbar != nullptr);
 
     const auto actions = toolbar->actions();
-    QCOMPARE(actions.size(), 13);
+    QCOMPARE(actions.size(), 15);
     QCOMPARE(actions.at(0)->objectName(), QString("newAction"));
     QCOMPARE(actions.at(1)->objectName(), QString("openAction"));
     QCOMPARE(actions.at(2)->objectName(), QString("saveAction"));
     QVERIFY(actions.at(3)->isSeparator());
-    QCOMPARE(actions.at(4)->objectName(), QString("undoAction"));
-    QCOMPARE(actions.at(5)->objectName(), QString("redoAction"));
-    QCOMPARE(actions.at(6)->objectName(), QString("deleteAction"));
-    QVERIFY(actions.at(7)->isSeparator());
-    QCOMPARE(actions.at(8)->objectName(), QString("selectAllAction"));
-    QCOMPARE(actions.at(9)->objectName(), QString("centerAction"));
-    QCOMPARE(actions.at(10)->objectName(), QString("fitWorkflowAction"));
-    QVERIFY(actions.at(11)->isSeparator());
-    QVERIFY(actions.at(12)->isSeparator() == false);
+    QCOMPARE(actions.at(4)->objectName(), QString("runPreviewAction"));
+    QVERIFY(actions.at(5)->isSeparator());
+    QCOMPARE(actions.at(6)->objectName(), QString("undoAction"));
+    QCOMPARE(actions.at(7)->objectName(), QString("redoAction"));
+    QCOMPARE(actions.at(8)->objectName(), QString("deleteAction"));
+    QVERIFY(actions.at(9)->isSeparator());
+    QCOMPARE(actions.at(10)->objectName(), QString("selectAllAction"));
+    QCOMPARE(actions.at(11)->objectName(), QString("centerAction"));
+    QCOMPARE(actions.at(12)->objectName(), QString("fitWorkflowAction"));
+    QVERIFY(actions.at(13)->isSeparator());
+    QVERIFY(actions.at(14)->isSeparator() == false);
 }
 
 void MainWindowTests::exposesToolbarStylingHooks()
@@ -1198,10 +1274,24 @@ void MainWindowTests::addsIconsToToolbarAndNodeLibrary()
     QVERIFY(nodeLibrary != nullptr);
     QVERIFY(languageButton != nullptr);
 
-    QVERIFY(!toolbar->actions().at(0)->icon().isNull());
-    QVERIFY(!toolbar->actions().at(1)->icon().isNull());
-    QVERIFY(!toolbar->actions().at(2)->icon().isNull());
-    QVERIFY(!toolbar->actions().at(5)->icon().isNull());
+    const auto actionByName = [&](QString const &objectName) -> QAction * {
+        for (auto *action : toolbar->actions()) {
+            if (action->objectName() == objectName)
+                return action;
+        }
+        return nullptr;
+    };
+
+    QVERIFY(actionByName("newAction") != nullptr);
+    QVERIFY(!actionByName("newAction")->icon().isNull());
+    QVERIFY(actionByName("openAction") != nullptr);
+    QVERIFY(!actionByName("openAction")->icon().isNull());
+    QVERIFY(actionByName("saveAction") != nullptr);
+    QVERIFY(!actionByName("saveAction")->icon().isNull());
+    QVERIFY(actionByName("runPreviewAction") != nullptr);
+    QVERIFY(!actionByName("runPreviewAction")->icon().isNull());
+    QVERIFY(actionByName("redoAction") != nullptr);
+    QVERIFY(!actionByName("redoAction")->icon().isNull());
     QVERIFY(!languageButton->icon().isNull());
     QVERIFY(!nodeLibrary->item(0)->icon().isNull());
     QVERIFY(!nodeLibrary->item(1)->icon().isNull());

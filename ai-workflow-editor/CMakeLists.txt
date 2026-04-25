@@ -101,11 +101,13 @@ add_library(ai_workflow_editor_lib
   src/app/LightTheme.cpp
   src/app/MainWindow.cpp
   src/app/NodeLibraryListWidget.cpp
+  src/app/RunPreviewWidget.cpp
   src/app/WorkbenchTabWidget.cpp
   src/domain/WorkflowNodeDefinition.cpp
   src/inspector/InspectorFieldSchema.cpp
   src/inspector/InspectorPanel.cpp
   src/registry/BuiltInNodeRegistry.cpp
+  src/runtime/WorkflowRunner.cpp
   src/workflow/WorkflowDocument.cpp
   src/qtnodes/CanvasMiniMapWidget.cpp
   src/qtnodes/EdgeAlignedNodeGeometry.cpp

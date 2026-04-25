@@ -24,6 +24,7 @@
     <file>icons/toolbar/new.svg</file>
     <file>icons/toolbar/open.svg</file>
     <file>icons/toolbar/redo.svg</file>
+    <file>icons/toolbar/run-preview.svg</file>
     <file>icons/toolbar/save.svg</file>
     <file>icons/toolbar/select-all.svg</file>
     <file>icons/toolbar/undo.svg</file>

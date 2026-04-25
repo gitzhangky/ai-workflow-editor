@@ -242,6 +242,77 @@ QImage makeValidationCardImage(bool chinese)
 
     return image;
 }
+
+QImage makeRunPreviewImage(bool chinese)
+{
+    QImage image(860, 330, QImage::Format_ARGB32_Premultiplied);
+    image.fill(QColor(QStringLiteral("#fffdf9")));
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QFont titleFont = painter.font();
+    titleFont.setPointSize(17);
+    titleFont.setBold(true);
+    painter.setFont(titleFont);
+    painter.setPen(QColor(QStringLiteral("#4c433b")));
+    painter.drawText(QRectF(24, 16, 812, 34),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     chinese ? QString::fromUtf8("运行预览") : QStringLiteral("Run Preview"));
+
+    QFont labelFont = painter.font();
+    labelFont.setPointSize(11);
+    labelFont.setBold(true);
+    painter.setFont(labelFont);
+
+    drawRoundedBox(painter,
+                   QRectF(42, 74, 260, 92),
+                   chinese ? QString::fromUtf8("测试输入\n用户粘贴一段样本文本")
+                           : QStringLiteral("Test Input\nPaste a sample message"),
+                   QColor(QStringLiteral("#f7f1e7")),
+                   QColor(QStringLiteral("#d8c7ac")));
+
+    drawRoundedBox(painter,
+                   QRectF(350, 74, 168, 92),
+                   QStringLiteral("Mock"),
+                   QColor(QStringLiteral("#eef6e8")),
+                   QColor(QStringLiteral("#8cb878")),
+                   QColor(QStringLiteral("#4f7a35")));
+
+    drawRoundedBox(painter,
+                   QRectF(566, 74, 252, 92),
+                   chinese ? QString::fromUtf8("最终输出\n快速检查变量是否传通")
+                           : QStringLiteral("Final Output\nCheck data flow quickly"),
+                   QColor(QStringLiteral("#edf3fb")),
+                   QColor(QStringLiteral("#b8cbe8")));
+
+    painter.setPen(QPen(QColor(QStringLiteral("#4b84d9")), 3.0, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(QPointF(312, 120), QPointF(340, 120));
+    painter.drawLine(QPointF(528, 120), QPointF(556, 120));
+
+    const QRectF tableRect(42, 204, 776, 78);
+    QPainterPath tablePath;
+    tablePath.addRoundedRect(tableRect, 12.0, 12.0);
+    painter.fillPath(tablePath, QColor(QStringLiteral("#fff8ee")));
+    painter.setPen(QPen(QColor(QStringLiteral("#ddd1bf")), 1.5));
+    painter.drawPath(tablePath);
+
+    painter.setPen(QColor(QStringLiteral("#6a5d50")));
+    painter.drawText(QRectF(64, 218, 740, 24),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     chinese ? QString::fromUtf8("追踪表：节点 / 类型 / 状态 / 输入 / 输出")
+                             : QStringLiteral("Trace table: Node / Type / Status / Input / Output"));
+
+    painter.setPen(QPen(QColor(QStringLiteral("#efe4d4")), 1.0));
+    painter.drawLine(QPointF(64, 252), QPointF(796, 252));
+    painter.setPen(QColor(QStringLiteral("#7b6b5a")));
+    painter.drawText(QRectF(64, 258, 740, 20),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     chinese ? QString::fromUtf8("本地预览不会调用真实模型或外部 API")
+                             : QStringLiteral("Local preview does not call real models or external APIs"));
+
+    return image;
+}
 }
 
 HelpDocumentWidget::HelpDocumentWidget(QWidget *parent)
@@ -279,6 +350,9 @@ void HelpDocumentWidget::registerIllustrationResources(bool chinese)
     _browser->document()->addResource(QTextDocument::ImageResource,
                                       QUrl(QStringLiteral("help://validation-card")),
                                       makeValidationCardImage(chinese));
+    _browser->document()->addResource(QTextDocument::ImageResource,
+                                      QUrl(QStringLiteral("help://run-preview")),
+                                      makeRunPreviewImage(chinese));
 }
 
 QString HelpDocumentWidget::buildHelpContent() const
@@ -308,7 +382,7 @@ QString HelpDocumentWidget::buildHelpContent() const
             "<li>Connect them as <code>Start → Prompt → LLM → Output</code>.</li>"
             "<li>Select Prompt and fill the user template.</li>"
             "<li>Select LLM and fill the model name.</li>"
-            "<li>Save the workflow, reopen it, then try exporting Python code.</li>"
+            "<li>Open <b>Run Preview</b> to inspect the Mock trace, then save and export.</li>"
             "</ol>");
         html += QStringLiteral(
             "<div class='help-figure'>"
@@ -345,6 +419,20 @@ QString HelpDocumentWidget::buildHelpContent() const
             "Export is available from <b>File &gt; Export</b>: Python (LangChain), Python (LangGraph), "
             "Python (CrewAI), and Python Script.</p>"
             "<div class='tip'>Exports are code skeletons. Use them as starting points and customize them in your own environment.</div>");
+
+        html += QStringLiteral("<h2>Run Preview</h2>");
+        html += QStringLiteral(
+            "<p><b>Run Preview</b> opens in the central workspace as a reusable tab. Enter a sample input and click "
+            "<b>Run Preview</b> to produce a deterministic local <b>Mock</b> execution trace.</p>"
+            "<ul>"
+            "<li>The trace table shows every visited node, its type, status, input, and output.</li>"
+            "<li>Prompt templates replace <code>{{input}}</code>, and mock LLM / Agent / Tool nodes produce readable placeholder output.</li>"
+            "<li>The preview is for authoring feedback only. It does not call real LLM providers, HTTP APIs, tools, or databases.</li>"
+            "</ul>"
+            "<div class='help-figure'>"
+            "<img src='help://run-preview' width='720'/>"
+            "<div class='caption'>Run Preview makes the canvas useful before real execution is wired in: check whether data flows through the graph as expected.</div>"
+            "</div>");
 
         html += QStringLiteral("<h2>Navigation</h2>");
         html += QStringLiteral(
@@ -415,11 +503,11 @@ QString HelpDocumentWidget::buildHelpContent() const
     html += QStringLiteral(
         "<ol>"
         "<li>添加 <b>开始</b>、<b>提示词</b>、<b>大模型</b> 和 <b>输出</b>。</li>"
-        "<li>把它们连成 <code>开始 → 提示词 → 大模型 → 输出</code>。</li>"
-        "<li>选中提示词节点，填写用户提示模板。</li>"
-        "<li>选中大模型节点，填写模型名称。</li>"
-        "<li>保存工作流，重新打开，再尝试导出 Python 代码。</li>"
-        "</ol>");
+            "<li>把它们连成 <code>开始 → 提示词 → 大模型 → 输出</code>。</li>"
+            "<li>选中提示词节点，填写用户提示模板。</li>"
+            "<li>选中大模型节点，填写模型名称。</li>"
+            "<li>打开 <b>运行预览</b> 看一遍 Mock 追踪，再保存和导出。</li>"
+            "</ol>");
     html += QStringLiteral(
         "<div class='help-figure'>"
         "<img src='help://minimal-workflow' width='720'/>"
@@ -456,6 +544,20 @@ QString HelpDocumentWidget::buildHelpContent() const
         "Python (CrewAI) 和 Python 脚本。</p>"
         "<div class='tip'>导出前会先做预检。如果底部问题面板里还有 warning / error，编辑器会先提示需要修复的节点问题，"
         "不会直接打开导出文件对话框。导出结果是代码骨架，适合作为开发起点，再到自己的工程里补充真实运行逻辑。</div>");
+
+    html += QStringLiteral("<h2>运行预览</h2>");
+    html += QStringLiteral(
+        "<p><b>运行预览</b> 会在中央工作区打开为可复用页签。输入一段测试文本后点击 "
+        "<b>运行预览</b>，编辑器会生成一次确定性的本地 <b>Mock</b> 执行追踪。</p>"
+        "<ul>"
+        "<li>追踪表会显示每个经过的节点、节点类型、状态、输入和输出。</li>"
+        "<li>提示词节点会替换 <code>{{input}}</code>，大模型 / Agent / 工具等节点会给出可读的占位输出。</li>"
+        "<li>它只用于设计阶段反馈，不会调用真实大模型、HTTP API、工具或数据库。</li>"
+        "</ul>"
+        "<div class='help-figure'>"
+        "<img src='help://run-preview' width='720'/>"
+        "<div class='caption'>运行预览让画布在接入真实执行前就有价值：先确认数据有没有按预期流过整张图。</div>"
+        "</div>");
 
     html += QStringLiteral("<h2>画布导航</h2>");
     html += QStringLiteral(

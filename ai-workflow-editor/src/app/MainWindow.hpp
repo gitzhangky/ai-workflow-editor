@@ -22,6 +22,7 @@ class QToolButton;
 class QWidget;
 class HelpDocumentWidget;
 class QtNodesEditorWidget;
+class RunPreviewWidget;
 class WorkbenchTabWidget;
 
 class MainWindow : public QMainWindow
@@ -59,6 +60,7 @@ private:
     void rebuildRecentFilesMenu();
     void exportWorkflow(WorkflowExporter::Format format);
     void openHelpTab();
+    void openRunPreviewTab();
     void handleTabChanged(int index);
 
     LanguageManager *_languageManager;
@@ -81,6 +83,7 @@ private:
     WorkbenchTabWidget *_tabWidget;
     QtNodesEditorWidget *_editorWidget;
     HelpDocumentWidget *_helpWidget;
+    RunPreviewWidget *_runPreviewWidget;
     QLabel *_selectionValidationSummaryLabel;
     QLabel *_zoomIndicatorLabel;
     QLabel *_problemsSummaryLabel;
@@ -96,6 +99,7 @@ private:
     QAction *_exportPythonAction;
     QAction *_exportLangGraphAction;
     QAction *_exportCrewAIAction;
+    QAction *_runPreviewAction;
     QAction *_copyAction;
     QAction *_pasteAction;
     QAction *_duplicateAction;

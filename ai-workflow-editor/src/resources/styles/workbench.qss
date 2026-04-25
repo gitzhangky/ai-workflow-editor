@@ -433,3 +433,73 @@ QTabWidget#workbenchTabWidget > QTabBar::close-button:hover {
     background: #e0d6c8;
     border-radius: 3px;
 }
+
+QWidget#runPreviewWidget {
+    background: #faf6ef;
+}
+
+QWidget#runPreviewWidget QLabel {
+    color: #4c433b;
+    font-weight: 700;
+}
+
+QTextEdit#runPreviewInputEdit,
+QTextEdit#runPreviewOutputEdit {
+    background: #fffdf9;
+    border: 1px solid #ddd2c2;
+    border-radius: 12px;
+    color: #2d241f;
+    padding: 10px 12px;
+    selection-background-color: #d9e4f3;
+    selection-color: #273a58;
+}
+
+QTextEdit#runPreviewInputEdit:focus,
+QTextEdit#runPreviewOutputEdit:focus {
+    border-color: #9bb6dc;
+}
+
+QPushButton#runPreviewRunButton {
+    background: #e8dcc7;
+    border: 1px solid #ccb892;
+    border-radius: 10px;
+    color: #322820;
+    font-weight: 700;
+    min-height: 34px;
+    padding: 0 14px;
+}
+
+QPushButton#runPreviewRunButton:hover {
+    background: #e1d2bb;
+    border-color: #bea77d;
+}
+
+QPushButton#runPreviewRunButton:pressed {
+    background: #d7c6aa;
+}
+
+QTableWidget#runPreviewTraceTable {
+    background: #fffaf2;
+    alternate-background-color: #fbf3e8;
+    border: 1px solid #e4dacb;
+    border-radius: 12px;
+    color: #4f453c;
+    gridline-color: transparent;
+    outline: none;
+    selection-background-color: #d9e4f3;
+    selection-color: #273a58;
+}
+
+QTableWidget#runPreviewTraceTable::item {
+    border-bottom: 1px solid #efe4d4;
+    padding: 7px 10px;
+}
+
+QTableWidget#runPreviewTraceTable::item:hover {
+    background: #f3eadb;
+}
+
+QTableWidget#runPreviewTraceTable::item:selected {
+    background: #d9e4f3;
+    color: #273a58;
+}
